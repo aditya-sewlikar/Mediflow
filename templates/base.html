@@ -1,0 +1,270 @@
+{% from "_macros.html" import icon, flash_messages %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#142B49">
+  <meta name="description" content="MediFlow is a calm, modern clinic workspace for appointments, live patient queues, and daily performance.">
+  <title>{% block title %}Dashboard{% endblock %} · MediFlow</title>
+  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/print.css') }}" media="print">
+</head>
+{% set is_auth_page = request.endpoint in ("login", "signup") or (login_enabled and not session.get("user")) %}
+{% if is_auth_page %}
+<body class="auth-page" data-refresh-seconds="{{ prefs.queue_refresh }}">
+  <a class="skip-link" href="#main">Skip to sign in</a>
+  {% block auth_content %}{% endblock %}
+  <script src="{{ url_for('static', filename='script.js') }}" defer></script>
+</body>
+{% else %}
+{% set endpoint = request.endpoint %}
+{% set page_names = {
+  "index": "Dashboard",
+  "queue_select": "Queue Management",
+  "queue_view": "Live Queue",
+  "appointments": "Appointments",
+  "appointment_ledger": "Appointment Ledger",
+  "patients": "Patients",
+  "patient_edit": "Patient Record",
+  "doctors": "Doctors",
+  "reports": "Reports",
+  "insights": "Insights",
+  "settings": "Settings",
+  "help": "Help & Support",
+  "search": "Search",
+  "admin_clinics": "Platform Clinics"
+} %}
+{% set page_name = page_names.get(endpoint, "MediFlow") %}
+{% set display_name = user_name or "Clinic team" %}
+{% set role_label = role|replace('_', ' ')|title if role else ("Local demo" if not login_enabled else "Clinic access") %}
+<body class="{{ 'density-compact' if prefs.density == 'compact' }}" data-refresh-seconds="{{ prefs.queue_refresh }}">
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar" data-sidebar aria-label="Primary navigation">
+      <a class="brand" href="{{ url_for('index') }}" aria-label="MediFlow dashboard">
+        <span class="brand-mark" aria-hidden="true">{{ icon("activity", "icon") }}</span>
+        <span class="brand-text">MediFlow<small>Clinic operations</small></span>
+      </a>
+
+      <nav class="sidebar-nav" aria-label="Main">
+        <p class="nav-label">Overview</p>
+        <a class="nav-link {{ 'is-active' if endpoint == 'index' }}" href="{{ url_for('index') }}" {% if endpoint == 'index' %}aria-current="page"{% endif %}>
+          {{ icon("dashboard") }}<span>Dashboard</span>
+        </a>
+
+        <p class="nav-label">Operations</p>
+        <a class="nav-link {{ 'is-active' if endpoint == 'appointments' }}" href="{{ url_for('appointments') }}" {% if endpoint == 'appointments' %}aria-current="page"{% endif %}>
+          {{ icon("calendar") }}<span>Appointments</span>
+        </a>
+        <a class="nav-link {{ 'is-active' if endpoint == 'appointment_ledger' }}" href="{{ url_for('appointment_ledger') }}" {% if endpoint == 'appointment_ledger' %}aria-current="page"{% endif %}>
+          {{ icon("list") }}<span>Appointment Ledger</span>
+        </a>
+        <a class="nav-link {{ 'is-active' if endpoint in ('queue_select', 'queue_view') }}" href="{{ url_for('queue_select') }}" {% if endpoint in ('queue_select', 'queue_view') %}aria-current="page"{% endif %}>
+          {{ icon("queue") }}<span>Queue Management</span>
+          {% if pulse.waiting %}<span class="nav-badge">{{ pulse.waiting }}</span>{% endif %}
+        </a>
+        <a class="nav-link {{ 'is-active' if endpoint in ('patients', 'patient_edit') }}" href="{{ url_for('patients') }}" {% if endpoint in ('patients', 'patient_edit') %}aria-current="page"{% endif %}>
+          {{ icon("users") }}<span>Patients</span>
+        </a>
+        <a class="nav-link {{ 'is-active' if endpoint == 'doctors' }}" href="{{ url_for('doctors') }}" {% if endpoint == 'doctors' %}aria-current="page"{% endif %}>
+          {{ icon("doctor") }}<span>Doctors</span>
+        </a>
+
+        <p class="nav-label">Analytics</p>
+        <a class="nav-link {{ 'is-active' if endpoint == 'reports' }}" href="{{ url_for('reports') }}" {% if endpoint == 'reports' %}aria-current="page"{% endif %}>
+          {{ icon("chart") }}<span>Reports</span>
+        </a>
+        <a class="nav-link {{ 'is-active' if endpoint == 'insights' }}" href="{{ url_for('insights') }}" {% if endpoint == 'insights' %}aria-current="page"{% endif %}>
+          {{ icon("insights") }}<span>Insights</span>
+        </a>
+
+        <p class="nav-label">Workspace</p>
+        <a class="nav-link {{ 'is-active' if endpoint == 'settings' }}" href="{{ url_for('settings') }}" {% if endpoint == 'settings' %}aria-current="page"{% endif %}>
+          {{ icon("settings") }}<span>Settings</span>
+        </a>
+        <a class="nav-link {{ 'is-active' if endpoint == 'help' }}" href="{{ url_for('help') }}" {% if endpoint == 'help' %}aria-current="page"{% endif %}>
+          {{ icon("help") }}<span>Help &amp; Support</span>
+        </a>
+        {% if is_platform_admin %}
+        <p class="nav-label">Platform</p>
+        <a class="nav-link {{ 'is-active' if endpoint == 'admin_clinics' }}" href="{{ url_for('admin_clinics') }}" {% if endpoint == 'admin_clinics' %}aria-current="page"{% endif %}>
+          {{ icon("building") }}<span>Platform Clinics</span>
+        </a>
+        {% endif %}
+      </nav>
+
+      <div class="sidebar-footer">
+        <a class="sidebar-help" href="{{ url_for('help') }}">
+          {{ icon("life-buoy") }}
+          <span><strong>Need a hand?</strong>Visit Help &amp; Support</span>
+        </a>
+        <div class="sidebar-user">
+          <span class="avatar" aria-hidden="true">{{ display_name|initials }}</span>
+          <div class="identity-text">
+            <strong>{{ display_name }}</strong>
+            <span>{{ role_label }}</span>
+          </div>
+          {% if session.get("user") %}
+          <form method="post" action="{{ url_for('logout') }}" class="sidebar-signout">
+            <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            <button class="icon-btn" type="submit" aria-label="Sign out" title="Sign out">{{ icon("logout") }}</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+    </aside>
+
+    <div class="sidebar-scrim" data-sidebar-scrim aria-hidden="true"></div>
+
+    <div class="app-main">
+      <header class="topbar">
+        <button class="icon-btn mobile-menu" type="button" data-menu-toggle aria-controls="sidebar" aria-expanded="false" aria-label="Open navigation">
+          {{ icon("menu") }}
+        </button>
+
+        <a class="topbar-title" href="{{ url_for('index') }}">
+          MediFlow <span aria-hidden="true">/</span> <strong>{{ page_name }}</strong>
+        </a>
+
+        <form class="global-search" method="get" action="{{ url_for('search') }}" role="search" data-global-search>
+          <label class="sr-only" for="global-search-input">Search patients, doctors, or appointments</label>
+          {{ icon("search") }}
+          <input id="global-search-input" type="search" name="q" value="{{ request.args.get('q', '') if endpoint == 'search' else '' }}" placeholder="Search patients, doctors, appointments…" autocomplete="off" data-search-input>
+          <kbd>/</kbd>
+        </form>
+
+        <div class="topbar-actions">
+          <button class="icon-btn topbar-search-toggle" type="button" data-search-toggle aria-label="Open search" aria-expanded="false">
+            {{ icon("search") }}
+          </button>
+
+          <div class="topbar-clinic" title="{{ clinic_name }}">
+            <span class="clinic-mark" aria-hidden="true">{{ icon("building") }}</span>
+            <div>
+              <strong>{{ clinic_name }}</strong>
+              <span>{{ 'Platform overview' if is_platform_admin and account_clinic == 'MediFlow Platform' else 'Workspace' }} · {{ now.strftime('%d %b %Y') }}</span>
+            </div>
+          </div>
+
+          <div class="menu" data-menu>
+            <button class="icon-btn topbar-icon" type="button" data-menu-trigger aria-expanded="false" aria-controls="notification-menu" aria-label="Notifications">
+              {{ icon("bell") }}
+              {% if notifications and prefs.notifications %}<span class="notification-dot">{{ notifications|length }}</span>{% endif %}
+            </button>
+            <div class="menu-panel menu-panel--notifications" id="notification-menu" data-menu-panel>
+              <div class="menu-head">
+                <div>
+                  <strong>Notifications</strong>
+                  <span>{{ notifications|length }} clinic update{{ '' if notifications|length == 1 else 's' }}</span>
+                </div>
+                <a class="menu-link" href="{{ url_for('queue_select') }}">Queue board</a>
+              </div>
+              {% if notifications %}
+              <div class="menu-list">
+                {% for n in notifications %}
+                <a class="notification-item" href="{{ n.url }}">
+                  <span class="notification-icon {{ 'notification-icon--warning' if n.tone == 'warning' else ('notification-icon--success' if n.tone == 'success' else '') }}">{{ icon(n.icon) }}</span>
+                  <span class="notification-copy">
+                    <strong>{{ n.title }}</strong>
+                    <span>{{ n.meta }}</span>
+                  </span>
+                </a>
+                {% endfor %}
+              </div>
+              {% else %}
+              <div class="menu-empty">You are all caught up. No clinic alerts right now.</div>
+              {% endif %}
+              <div class="menu-foot">
+                <a class="menu-link" href="{{ url_for('help') }}">Notification settings</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="menu" data-menu>
+            <button class="profile-button" type="button" data-menu-trigger aria-expanded="false" aria-controls="profile-menu">
+              <span class="avatar avatar--sm" aria-hidden="true">{{ display_name|initials }}</span>
+              <span class="profile-meta">
+                <strong>{{ display_name }}</strong>
+                <span>{{ role_label }}</span>
+              </span>
+              {{ icon("chevron-down", "profile-chevron") }}
+            </button>
+            <div class="menu-panel menu-panel--profile" id="profile-menu" data-menu-panel>
+              <div class="profile-card">
+                <span class="avatar" aria-hidden="true">{{ display_name|initials }}</span>
+                <div>
+                  <strong>{{ display_name }}</strong>
+                  <span>{{ role_label }}{% if clinic_name %} · {{ clinic_name }}{% endif %}</span>
+                </div>
+              </div>
+              <div class="profile-menu-list">
+                <a class="profile-menu-item" href="{{ url_for('settings') }}">{{ icon("user") }} Profile &amp; preferences</a>
+                <a class="profile-menu-item" href="{{ url_for('help') }}">{{ icon("help") }} Help &amp; support</a>
+                <a class="profile-menu-item" href="{{ url_for('insights') }}">{{ icon("insights") }} Clinic insights</a>
+                {% if is_platform_admin %}
+                <a class="profile-menu-item" href="{{ url_for('admin_clinics') }}">{{ icon("building") }} Platform Clinics</a>
+                {% if session.get("acting_clinic_id") %}
+                <form method="post" action="{{ url_for('admin_global_view') }}" class="profile-signout-form">
+                  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+                  <button class="profile-menu-item" type="submit">{{ icon("activity") }} Return to global view</button>
+                </form>
+                {% endif %}
+                {% endif %}
+                {% if session.get("user") %}
+                <div class="profile-menu-sep"></div>
+                <form method="post" action="{{ url_for('logout') }}" class="profile-signout-form">
+                  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+                  <button class="profile-menu-item profile-menu-item--danger" type="submit">{{ icon("logout") }} Sign out</button>
+                </form>
+                {% else %}
+                <div class="profile-menu-sep"></div>
+                <span class="profile-menu-item is-muted">{{ icon("shield") }} Local demo session</span>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main class="page" id="main" tabindex="-1">
+        {{ flash_messages() }}
+        {% block content %}{% endblock %}
+      </main>
+
+      <footer class="app-footer">
+        <span>MediFlow · calmer queues, better care.</span>
+        <span>Clinic operations workspace · {{ now.year }}</span>
+      </footer>
+    </div>
+  </div>
+
+  <dialog class="dialog dialog--sm" id="confirm-dialog" aria-labelledby="confirm-title">
+    <div class="dialog-head">
+      <div>
+        <h2 class="dialog-title" id="confirm-title">Please confirm</h2>
+        <p class="dialog-sub">This action will update the clinic schedule.</p>
+      </div>
+      <button class="icon-btn dialog-close" type="button" data-confirm-cancel aria-label="Close dialog">{{ icon("x") }}</button>
+    </div>
+    <div class="dialog-body">
+      <p class="muted" id="confirm-message">Are you sure you want to continue?</p>
+    </div>
+    <div class="dialog-foot">
+      <button class="btn btn--secondary" type="button" data-confirm-cancel>Keep as is</button>
+      <button class="btn btn--danger-solid" type="button" data-confirm-accept>Yes, continue</button>
+    </div>
+  </dialog>
+
+  <script src="{{ url_for('static', filename='script.js') }}" defer></script>
+</body>
+{% endif %}
+</html>

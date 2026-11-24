@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head-main">
+    <p class="eyebrow">Settings</p>
+    <h1 class="page-title">Workspace settings</h1>
+    <p class="page-sub">Tune the clinic workspace, notification preferences, and display density for your team.</p>
+  </div>
+</div>
+
+<div class="settings-grid">
+  <div class="settings-stack">
+    <section class="panel" aria-labelledby="prefs-title">
+      <div class="panel-head">
+        <div class="panel-head-main">
+          <h2 class="panel-title" id="prefs-title">{{ icon("sliders") }} Preferences</h2>
+          <p class="panel-sub">These settings apply to this browser session.</p>
+        </div>
+      </div>
+      <form method="post" action="{{ url_for('settings') }}">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <div class="panel-body">
+          <div class="setting-row">
+            <div class="setting-copy">
+              <strong>Clinic notifications</strong>
+              <span>Show live queue alerts and appointment updates in the top bar.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" name="notifications" {% if prefs.notifications %}checked{% endif %} aria-label="Enable clinic notifications">
+              <span class="switch-track"></span>
+            </label>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-copy">
+              <strong>Queue refresh interval</strong>
+              <span>How often the live queue board checks for status changes.</span>
+            </div>
+            <select class="select" name="queue_refresh" aria-label="Queue refresh interval">
+              {% for value, label in [(15, 'Every 15 seconds'), (30, 'Every 30 seconds'), (60, 'Every 60 seconds')] %}
+              <option value="{{ value }}" {% if prefs.queue_refresh == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-copy">
+              <strong>Display density</strong>
+              <span>Compact spacing fits more rows on screen for busy front desks.</span>
+            </div>
+            <select class="select" name="density" aria-label="Display density">
+              <option value="comfortable" {% if prefs.density == 'comfortable' %}selected{% endif %}>Comfortable</option>
+              <option value="compact" {% if prefs.density == 'compact' %}selected{% endif %}>Compact</option>
+            </select>
+          </div>
+        </div>
+        <div class="dialog-foot" style="border-radius: 0 0 var(--radius-xl) var(--radius-xl)">
+          <button class="btn btn--secondary" type="reset">Reset form</button>
+          <button class="btn btn--primary" type="submit">{{ icon("check") }} Save preferences</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel" aria-labelledby="clinic-title">
+      <div class="panel-head">
+        <div class="panel-head-main">
+          <h2 class="panel-title" id="clinic-title">{{ icon("building") }} Clinic workspace</h2>
+          <p class="panel-sub">Identity and access information for this installation.</p>
+        </div>
+      </div>
+      <div class="account-card">
+        <span class="avatar" aria-hidden="true">{{ (user_name or 'Clinic team')|initials }}</span>
+        <div>
+          <strong>{{ account_name or 'Clinic team' }}</strong>
+          <span>{{ role|replace('_', ' ')|title if role else ('Local demo session' if not login_enabled else 'Clinic access') }} · {{ clinic_name }}</span>
+        </div>
+      </div>
+      <div class="panel-body">
+        <dl class="definition-list">
+          <div><dt>Account</dt><dd>{{ account_name or 'Local demo session' }}</dd></div>
+          {% if account_email %}<div><dt>Email</dt><dd>{{ account_email }}</dd></div>{% endif %}
+          <div><dt>Clinic name</dt><dd>{{ clinic_name }}</dd></div>
+          <div><dt>Support email</dt><dd><a href="mailto:{{ support_email }}">{{ support_email }}</a></dd></div>
+          <div><dt>App version</dt><dd>{{ app_version }}</dd></div>
+          <div><dt>Sign-in</dt><dd>{{ 'Enabled' if login_enabled else 'Disabled for demo' }}</dd></div>
+        </dl>
+      </div>
+    </section>
+  </div>
+
+  <aside class="settings-stack">
+    <section class="panel" aria-labelledby="status-title">
+      <div class="panel-head">
+        <div class="panel-head-main">
+          <h2 class="panel-title" id="status-title">{{ icon("shield") }} System status</h2>
+          <p class="panel-sub">Live checks against the clinic database.</p>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="status-list">
+          <div class="status-row">
+            <span>Oracle database</span>
+            <strong><i class="status-dot{{ '' if db_ok else ' status-dot--bad' }}"></i>{{ 'Connected' if db_ok else 'Unavailable' }}</strong>
+          </div>
+          <div class="status-row">
+            <span>Patients on record</span>
+            <strong>{{ counts.get('patients', 0) }}</strong>
+          </div>
+          <div class="status-row">
+            <span>Doctors on roster</span>
+            <strong>{{ counts.get('doctors', 0) }}</strong>
+          </div>
+          <div class="status-row">
+            <span>Appointments stored</span>
+            <strong>{{ counts.get('appointments', 0) }}</strong>
+          </div>
+          <div class="status-row">
+            <span>Queue refresh</span>
+            <strong><i class="status-dot status-dot--warn"></i>{{ prefs.queue_refresh }} seconds</strong>
+          </div>
+        </div>
+      </div>
+      <div class="panel-foot">
+        <span>{{ icon("info") }} If the database is unavailable, check the DB environment variables and restart the app.</span>
+      </div>
+    </section>
+
+    <section class="panel panel--tint" aria-labelledby="reset-title">
+      <div class="panel-body">
+        <h2 class="panel-title" id="reset-title">Reset preferences</h2>
+        <p class="hint hint--spaced">Restore the default notification, refresh, and density settings for this session.</p>
+        <form method="post" action="{{ url_for('settings') }}" data-confirm="Reset all workspace preferences to their defaults?" data-confirm-title="Reset preferences">
+          <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+          <input type="hidden" name="action" value="reset">
+          <button class="btn btn--secondary btn--block" type="submit" style="margin-top: 14px">{{ icon("refresh") }} Reset to defaults</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="privacy-title">
+      <div class="panel-body">
+        <h2 class="panel-title" id="privacy-title">{{ icon("lock") }} Data & privacy</h2>
+        <p class="hint hint--spaced">Patient information is stored in the connected Oracle database. Access is limited to signed-in clinic users, and form submissions are CSRF protected.</p>
+        <a class="btn btn--ghost btn--sm" href="{{ url_for('help') }}" style="margin-top: 10px">Read the support guide {{ icon("arrow-right") }}</a>
+      </div>
+    </section>
+  </aside>
+</div>
+{% endblock %}

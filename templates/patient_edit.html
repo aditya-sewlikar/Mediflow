@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, status_badge, empty_state %}
+{% block title %}{{ p.full_name }}{% endblock %}
+{% block content %}
+{% set v_name = form_data.get('full_name', p.full_name) %}
+{% set v_phone = form_data.get('phone', p.phone) %}
+{% set v_email = form_data.get('email', p.email or '') %}
+{% set v_gender = form_data.get('gender', p.gender or '') %}
+{% set v_dob = form_data.get('date_of_birth', p.date_of_birth.isoformat() if p.date_of_birth else '') %}
+
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <a href="{{ url_for('patients') }}">Patients</a>
+  {{ icon("chevron-right") }}
+  <span aria-current="page">{{ p.full_name }}</span>
+</nav>
+
+<div class="page-head">
+  <div class="profile-head">
+    <span class="avatar" aria-hidden="true">{{ p.full_name|initials }}</span>
+    <div>
+      <p class="eyebrow">Patient record · ID {{ p.patient_id }}</p>
+      <h1 class="profile-title">{{ p.full_name }}</h1>
+      <div class="profile-meta">
+        <span>{{ icon("phone") }} {{ p.phone }}</span>
+        {% if p.email %}<span>{{ icon("mail") }} {{ p.email }}</span>{% endif %}
+        <span>{{ icon("calendar") }} {{ p.date_of_birth.strftime('%d %b %Y') if p.date_of_birth else 'Date of birth not set' }}</span>
+        <span>{{ icon("user") }} {{ p.gender or 'Gender not stated' }}</span>
+      </div>
+    </div>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn--secondary" href="{{ url_for('patients') }}">{{ icon("arrow-left") }}<span>All patients</span></a>
+    {% if can_manage %}
+    <a class="btn btn--primary" href="{{ url_for('appointments', patient_id=p.patient_id) }}#book">{{ icon("calendar-plus") }}<span>Book appointment</span></a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="profile-grid">
+  <section class="panel" aria-labelledby="history-title">
+    <div class="panel-head">
+      <div>
+        <h2 class="panel-title" id="history-title">Visit history</h2>
+        <p class="panel-sub">{{ history|length }} appointment{{ '' if history|length == 1 else 's' }} on record, newest first.</p>
+      </div>
+      {% if can_manage %}
+      <a class="btn btn--ghost btn--sm" href="{{ url_for('appointments') }}">{{ icon("calendar") }} Schedule</a>
+      {% endif %}
+    </div>
+    <div class="panel-body">
+      {% if history %}
+      <div class="timeline">
+        {% for h in history %}
+        <article class="timeline-item">
+          <div class="timeline-date">
+            {{ h.appointment_datetime.strftime('%d %b %Y') }}
+            <span class="cell-sub">{{ h.appointment_datetime|hm }}</span>
+          </div>
+          <div class="timeline-main">
+            <strong>{{ h.doctor_name }}</strong>
+            <p>{{ h.reason or 'No reason recorded for this visit.' }}</p>
+          </div>
+          <div class="timeline-side">
+            <span class="token-pill">Token <b>{{ h.token_no if h.token_no else '—' }}</b></span>
+            {{ status_badge(h.status) }}
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      {{ empty_state("calendar", "No visits recorded yet", "This patient has not had an appointment at the clinic. Book the first visit when they are ready.", url_for('appointments', patient_id=p.patient_id) + '#book' if can_manage else None, "Book first appointment" if can_manage else None) }}
+      {% endif %}
+    </div>
+  </section>
+
+  <aside class="stack">
+    {% if can_manage %}
+    <section class="panel" aria-labelledby="edit-title">
+      <div class="panel-head panel-head--plain">
+        <div>
+          <h2 class="panel-title" id="edit-title">Patient details</h2>
+          <p class="panel-sub">Keep the record accurate for future visits.</p>
+        </div>
+      </div>
+      <div class="panel-body">
+        <form class="form" method="post" action="{{ url_for('patient_edit', patient_id=p.patient_id) }}">
+          <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+          <label class="field">
+            <span class="field-label">Full name <span class="required" aria-hidden="true">*</span></span>
+            <input class="input" name="full_name" maxlength="100" value="{{ v_name }}" autocomplete="name" required>
+          </label>
+          <label class="field">
+            <span class="field-label">Phone <span class="required" aria-hidden="true">*</span></span>
+            <input class="input" name="phone" inputmode="numeric" pattern="[0-9]{7,15}" maxlength="15" value="{{ v_phone }}" autocomplete="tel" required>
+          </label>
+          <label class="field">
+            <span class="field-label">Email <span class="optional">Optional</span></span>
+            <input class="input" name="email" type="email" maxlength="100" value="{{ v_email }}" autocomplete="email">
+          </label>
+          <div class="field-grid">
+            <label class="field">
+              <span class="field-label">Gender <span class="optional">Optional</span></span>
+              <select class="select" name="gender">
+                <option value="">Not stated</option>
+                {% for option in ["Male", "Female", "Other"] %}
+                <option value="{{ option }}" {% if v_gender == option %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="field">
+              <span class="field-label">Date of birth <span class="optional">Optional</span></span>
+              <input class="input" name="date_of_birth" type="date" max="{{ today.isoformat() }}" value="{{ v_dob }}">
+            </label>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn--primary" type="submit">{{ icon("check") }} Save details</button>
+          </div>
+        </form>
+      </div>
+    </section>
+    {% else %}
+    <section class="panel" aria-labelledby="details-title">
+      <div class="panel-head panel-head--plain">
+        <div>
+          <h2 class="panel-title" id="details-title">Patient details</h2>
+          <p class="panel-sub">Read-only access for this role.</p>
+        </div>
+      </div>
+      <div class="panel-body">
+        <dl class="definition-list">
+          <div><dt>Full name</dt><dd>{{ p.full_name }}</dd></div>
+          <div><dt>Patient ID</dt><dd>{{ p.patient_id }}</dd></div>
+          <div><dt>Phone</dt><dd>{{ p.phone }}</dd></div>
+          <div><dt>Email</dt><dd>{{ p.email or '—' }}</dd></div>
+          <div><dt>Gender</dt><dd>{{ p.gender or 'Not stated' }}</dd></div>
+          <div><dt>Date of birth</dt><dd>{{ p.date_of_birth.strftime('%d %b %Y') if p.date_of_birth else '—' }}</dd></div>
+        </dl>
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="panel panel--tint" aria-labelledby="record-note-title">
+      <div class="panel-body">
+        <h2 class="panel-title" id="record-note-title">Record notes</h2>
+        <p class="hint hint--spaced">This page shows contact details and the visit timeline. Clinical notes are not stored in this prototype.</p>
+      </div>
+    </section>
+  </aside>
+</div>
+{% endblock %}

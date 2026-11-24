@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, empty_state, doctor_queue_card %}
+{% block title %}Queue Management{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head-main">
+    <p class="eyebrow">Queue Management</p>
+    <h1 class="page-title">Live queue board</h1>
+    <p class="page-sub">{{ 'All recorded appointments' if scope == 'all' else today.strftime('%A, %d %B %Y') }} · Every doctor's current token, next patient, and waiting load in one view.</p>
+  </div>
+  <div class="page-actions">
+    <div class="segmented" aria-label="Queue scope">
+      <a class="{{ 'is-active' if scope == 'all' }}" href="{{ url_for('queue_select', scope='all') }}">All appointments</a>
+      <a class="{{ 'is-active' if scope == 'day' }}" href="{{ url_for('queue_select', scope='day') }}">Today</a>
+    </div>
+    <a class="btn btn--secondary" href="{{ url_for('appointments') }}">{{ icon("calendar") }}<span>Appointments</span></a>
+    <a class="btn btn--secondary" href="{{ url_for('reports') }}">{{ icon("chart") }}<span>Day report</span></a>
+  </div>
+</div>
+
+{% if doctors %}
+{% set totals = namespace(waiting=0, booked=0, serving=0) %}
+{% for d in doctors %}
+{% set totals.waiting = totals.waiting + d.waiting %}
+{% set totals.booked = totals.booked + d.booked %}
+{% set totals.serving = totals.serving + (1 if d.serving_token else 0) %}
+{% endfor %}
+<section class="kpi-grid" aria-label="Queue summary">
+  <article class="kpi-card">
+    <p class="kpi-label">Active doctors</p>
+    <p class="kpi-value">{{ doctors|length }}</p>
+    <p class="kpi-meta">{{ totals.serving }} in consultation now</p>
+  </article>
+  <article class="kpi-card">
+    <p class="kpi-label">Waiting patients</p>
+    <p class="kpi-value">{{ totals.waiting }}</p>
+    <p class="kpi-meta">Checked in across all queues</p>
+  </article>
+  <article class="kpi-card">
+    <p class="kpi-label">Scheduled tokens</p>
+    <p class="kpi-value">{{ totals.booked }}</p>
+    <p class="kpi-meta">Still to be checked in</p>
+  </article>
+  <article class="kpi-card">
+    <p class="kpi-label">Queue board</p>
+    <p class="kpi-value" style="font-size: 1.1rem">Live</p>
+    <p class="kpi-meta">Updates as statuses change</p>
+  </article>
+</section>
+
+<div class="queue-select-grid">
+  {% for d in doctors %}
+  {{ doctor_queue_card(d) }}
+  {% endfor %}
+</div>
+{% else %}
+<div class="panel">
+  {{ empty_state("doctor", "No queues are open", "Add a doctor to the roster to start a queue and take appointments.", url_for('doctors') if can_manage else None, "Add a doctor" if can_manage else None) }}
+</div>
+{% endif %}
+{% endblock %}

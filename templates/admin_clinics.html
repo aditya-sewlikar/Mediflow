@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, empty_state %}
+{% block title %}Platform Clinics{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head-main">
+    <p class="eyebrow">Platform administration</p>
+    <h1 class="page-title">Clinics on MediFlow</h1>
+    <p class="page-sub">A global view of every registered clinic, its accounts and its own clinical records. Clinic administrators never see this page.</p>
+  </div>
+  <div class="page-actions">
+    {% if acting_clinic_id %}
+    <form method="post" action="{{ url_for('admin_global_view') }}">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <button class="btn btn--secondary" type="submit">{{ icon("activity") }}<span>Return to global view</span></button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<section class="kpi-grid" aria-label="Platform totals">
+  <article class="kpi-card">
+    <p class="kpi-label">Clinics</p>
+    <p class="kpi-value">{{ totals.clinics or 0 }}</p>
+    <p class="kpi-meta">Registered workspaces</p>
+  </article>
+  <article class="kpi-card">
+    <p class="kpi-label">Accounts</p>
+    <p class="kpi-value">{{ totals.accounts or 0 }}</p>
+    <p class="kpi-meta">Platform and clinic users</p>
+  </article>
+  <article class="kpi-card">
+    <p class="kpi-label">Patients</p>
+    <p class="kpi-value">{{ totals.patients or 0 }}</p>
+    <p class="kpi-meta">Across all clinics</p>
+  </article>
+  <article class="kpi-card">
+    <p class="kpi-label">Doctors</p>
+    <p class="kpi-value">{{ totals.doctors or 0 }}</p>
+    <p class="kpi-meta">Across all clinics</p>
+  </article>
+  <article class="kpi-card">
+    <p class="kpi-label">Appointments</p>
+    <p class="kpi-value">{{ totals.appointments or 0 }}</p>
+    <p class="kpi-meta">All recorded visits</p>
+  </article>
+</section>
+
+<section class="panel" aria-labelledby="clinics-title">
+  <div class="panel-head">
+    <div class="panel-head-main">
+      <h2 class="panel-title" id="clinics-title">{{ icon("building") }} Registered clinics</h2>
+      <p class="panel-sub">Choose a clinic to work inside its isolated workspace. Counts are computed from that clinic's records only.</p>
+    </div>
+  </div>
+  <div class="panel-body">
+    {% if clinics %}
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Registered clinics">
+      <table>
+        <caption class="sr-only">Clinics and their record counts</caption>
+        <thead>
+          <tr>
+            <th scope="col">Clinic</th>
+            <th scope="col">Status</th>
+            <th scope="col">Accounts</th>
+            <th scope="col">Patients</th>
+            <th scope="col">Doctors</th>
+            <th scope="col">Appointments</th>
+            <th scope="col"><span class="sr-only">Action</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in clinics %}
+          <tr>
+            <td>
+              <strong>{{ c.clinic_name }}</strong>
+              <span class="muted">/{{ c.slug }}{% if c.is_default %} · legacy default{% endif %}</span>
+            </td>
+            <td><span class="status-pill status-pill--{{ 'available' if c.status == 'ACTIVE' else 'offline' }}">{{ c.status|title }}</span></td>
+            <td>{{ c.users }}</td>
+            <td>{{ c.patients }}</td>
+            <td>{{ c.doctors }}</td>
+            <td>{{ c.appointments }}</td>
+            <td>
+              {% if c.status == 'ACTIVE' and c.clinic_id != acting_clinic_id %}
+              <form method="post" action="{{ url_for('admin_work_as_clinic', clinic_id=c.clinic_id) }}">
+                <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+                <button class="btn btn--secondary" type="submit">Work here</button>
+              </form>
+              {% elif c.clinic_id == acting_clinic_id %}
+              <span class="muted">Current workspace</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      {{ empty_state("building", "No clinics yet", "The first self-service registration will create one.", None, None) }}
+    {% endif %}
+  </div>
+</section>
+
+<section class="panel" aria-labelledby="accounts-title">
+  <div class="panel-head">
+    <div class="panel-head-main">
+      <h2 class="panel-title" id="accounts-title">{{ icon("users") }} Accounts</h2>
+      <p class="panel-sub">Platform administrators have no clinic context; every other account belongs to exactly one clinic.</p>
+    </div>
+  </div>
+  <div class="panel-body">
+    <div class="table-wrap" tabindex="0" role="region" aria-label="All accounts">
+      <table>
+        <caption class="sr-only">All platform and clinic accounts</caption>
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Username</th>
+            <th scope="col">Email</th>
+            <th scope="col">Role</th>
+            <th scope="col">Clinic</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in accounts %}
+          <tr>
+            <td>{{ u.full_name }}</td>
+            <td>{{ u.username }}</td>
+            <td>{{ u.email or '—' }}</td>
+            <td>{{ u.role|replace('_', ' ')|title }}</td>
+            <td>{{ u.clinic_name or 'All clinics (platform)' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}

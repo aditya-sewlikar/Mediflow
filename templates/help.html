@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Help & Support{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head-main">
+    <p class="eyebrow">Help &amp; Support</p>
+    <h1 class="page-title">How can we help?</h1>
+    <p class="page-sub">Answers for the front desk, shortcuts for busy days, and a direct line to support.</p>
+  </div>
+</div>
+
+<div class="help-grid">
+  <div class="help-stack">
+    <section class="panel" aria-labelledby="faq-title">
+      <div class="panel-head">
+        <div class="panel-head-main">
+          <h2 class="panel-title" id="faq-title">{{ icon("help") }} Frequently asked questions</h2>
+          <p class="panel-sub">The workflows clinic teams ask about most.</p>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="faq-list">
+          <details class="faq-item" open>
+            <summary>How do I book an appointment? {{ icon("chevron-down") }}</summary>
+            <div class="faq-answer">Open <a href="{{ url_for('appointments') }}#book">Appointments</a>, choose the patient, doctor, and date and time, then submit the form. The doctor's schedule is checked for clashes and the next token is assigned automatically unless you enter one manually.</div>
+          </details>
+          <details class="faq-item">
+            <summary>What is the difference between scheduled, waiting, and in consultation? {{ icon("chevron-down") }}</summary>
+            <div class="faq-answer">Scheduled means the appointment is booked but the patient has not arrived. Waiting means the patient has checked in and is in line. In consultation means the doctor is currently seeing that patient. Completed and cancelled are the closed states.</div>
+          </details>
+          <details class="faq-item">
+            <summary>How do I move a patient through the queue? {{ icon("chevron-down") }}</summary>
+            <div class="faq-answer">Use the action button on the appointment row or the live queue board: Check in, Start, then Complete. Only one patient can be in consultation with a doctor at a time; complete the current visit before starting the next.</div>
+          </details>
+          <details class="faq-item">
+            <summary>Why is a token number already taken? {{ icon("chevron-down") }}</summary>
+            <div class="faq-answer">Tokens are unique per doctor, per day. If you enter a manual token that already exists for that doctor on that date, choose the next available number or leave the field empty to let MediFlow assign it.</div>
+          </details>
+          <details class="faq-item">
+            <summary>How do I find a patient quickly? {{ icon("chevron-down") }}</summary>
+            <div class="faq-answer">Use the global search in the top bar, or open <a href="{{ url_for('patients') }}">Patients</a> and search by name, phone number, or patient ID. Search results link straight to the patient record.</div>
+          </details>
+          <details class="faq-item">
+            <summary>How do I create a clinic account? {{ icon("chevron-down") }}</summary>
+            <div class="faq-answer">Open the <a href="{{ url_for('login') }}">sign-in page</a> and choose <strong>Register a clinic</strong>. Enter your clinic name plus the administrator's name, email, username and password. Registration creates an isolated clinic and a clinic administrator in one transaction. Clinic administrators cannot see other clinics or platform administration; platform administrators can view all clinics and choose one to work in from <strong>Platform Clinics</strong>.</div>
+          </details>
+          <details class="faq-item">
+            <summary>How do I review all appointments, including past ones? {{ icon("chevron-down") }}</summary>
+            <div class="faq-answer">Open the <a href="{{ url_for('appointment_ledger') }}">appointment ledger</a> from the dashboard or sidebar. It lists every appointment from the database with sorting, patient and doctor filters, status and date filters, and pagination. Today's rows are highlighted.</div>
+          </details>
+          <details class="faq-item">
+            <summary>What does the completion rate include? {{ icon("chevron-down") }}</summary>
+            <div class="faq-answer">Completion rate is completed appointments divided by all appointments for the selected day or insight range. Cancelled and still-open appointments count in the total, so the rate reflects the full schedule.</div>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="workflows-title">
+      <div class="panel-head">
+        <div class="panel-head-main">
+          <h2 class="panel-title" id="workflows-title">{{ icon("life-buoy") }} Common workflows</h2>
+          <p class="panel-sub">Jump straight into the task you need.</p>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="help-links">
+          <a class="quick-action" href="{{ url_for('appointments') }}#book">{{ icon("calendar-plus") }}<span>Book an appointment</span>{{ icon("arrow-right") }}</a>
+          <a class="quick-action" href="{{ url_for('appointment_ledger') }}">{{ icon("list") }}<span>Review every appointment</span>{{ icon("arrow-right") }}</a>
+          <a class="quick-action" href="{{ url_for('patients') }}?open=1">{{ icon("users") }}<span>Register a patient</span>{{ icon("arrow-right") }}</a>
+          <a class="quick-action" href="{{ url_for('queue_select') }}">{{ icon("queue") }}<span>Open queue management</span>{{ icon("arrow-right") }}</a>
+          <a class="quick-action" href="{{ url_for('reports') }}">{{ icon("chart") }}<span>Review today's report</span>{{ icon("arrow-right") }}</a>
+          <a class="quick-action" href="{{ url_for('insights') }}">{{ icon("insights") }}<span>Explore clinic insights</span>{{ icon("arrow-right") }}</a>
+          <a class="quick-action" href="{{ url_for('settings') }}">{{ icon("settings") }}<span>Adjust workspace settings</span>{{ icon("arrow-right") }}</a>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <aside class="help-stack">
+    <section class="support-card" aria-labelledby="support-title">
+      <h2 id="support-title">Still need help?</h2>
+      <p>Send the clinic support team a note with the page you were on and what you expected to happen.</p>
+      <a class="btn btn--secondary btn--sm" href="mailto:{{ support_email }}?subject=MediFlow%20support%20request">{{ icon("mail") }} Email support</a>
+      <a class="support-email" href="mailto:{{ support_email }}">{{ icon("mail") }} {{ support_email }}</a>
+    </section>
+
+    <section class="panel" aria-labelledby="shortcuts-title">
+      <div class="panel-head">
+        <div class="panel-head-main">
+          <h2 class="panel-title" id="shortcuts-title">{{ icon("keyboard") }} Keyboard shortcuts</h2>
+          <p class="panel-sub">Small things that save time.</p>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="shortcut-list">
+          <div class="shortcut-row"><span>Focus global search</span><span class="shortcut-keys"><kbd class="kbd">/</kbd></span></div>
+          <div class="shortcut-row"><span>Close a menu or dialog</span><span class="shortcut-keys"><kbd class="kbd">Esc</kbd></span></div>
+          <div class="shortcut-row"><span>Print the current page</span><span class="shortcut-keys"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">P</kbd></span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="health-title">
+      <div class="panel-head panel-head--plain">
+        <div class="panel-head-main">
+          <h2 class="panel-title" id="health-title">{{ icon("shield") }} Workspace health</h2>
+          <p class="panel-sub">Quick checks before contacting support.</p>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="status-list">
+          <div class="status-row">
+            <span>Database connection</span>
+            <strong><i class="status-dot{{ '' if db_ok else ' status-dot--bad' }}"></i>{{ 'Healthy' if db_ok else 'Unavailable' }}</strong>
+          </div>
+          <div class="status-row">
+            <span>App version</span>
+            <strong>{{ app_version }}</strong>
+          </div>
+          <div class="status-row">
+            <span>Support hours</span>
+            <strong>Mon–Fri · 09:00–18:00</strong>
+          </div>
+        </div>
+      </div>
+    </section>
+  </aside>
+</div>
+{% endblock %}

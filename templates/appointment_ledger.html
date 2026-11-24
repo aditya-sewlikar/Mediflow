@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, status_badge, empty_state %}
+{% block title %}Appointment Ledger{% endblock %}
+{% block content %}
+{% macro sort_header(label, key) -%}
+  {% set next_dir = 'desc' if filters.sort == key and filters.dir == 'asc' else 'asc' %}
+  <a class="table-sort {{ 'is-active' if filters.sort == key }}" href="{{ ledger_url(sort=key, dir=next_dir, page=1) }}">
+    {{ label }}
+    <span aria-hidden="true">{{ '↑' if filters.sort == key and filters.dir == 'asc' else ('↓' if filters.sort == key else '↕') }}</span>
+  </a>
+{%- endmacro %}
+
+<div class="page-head">
+  <div class="page-head-main">
+    <p class="eyebrow">Reception dashboard</p>
+    <h1 class="page-title">Appointment ledger</h1>.
+    <p class="page-sub">Every appointment in the clinic, past and future, in one sortable spreadsheet-style view. Figures come directly from the database.</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn--secondary" href="{{ url_for('appointments') }}">{{ icon("calendar") }}<span>Day schedule</span></a>
+    {% if can_manage %}
+    <a class="btn btn--primary" href="{{ url_for('appointments') }}#book">{{ icon("calendar-plus") }}<span>New appointment</span></a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="ledger-summary" aria-label="Appointment totals">
+  {% for key, label, tone in [('all', 'All appointments', ''), ('past', 'Past', 'past'), ('today', 'Today', 'today'), ('upcoming', 'Upcoming', 'upcoming')] %}
+  <a class="ledger-summary-card {{ 'is-selected' if filters.period == key }} {{ 'ledger-summary-card--' ~ tone if tone }}" href="{{ ledger_url(period=key, date='', from='', to='', page=1) }}">
+    <span>{{ label }}</span>
+    <strong>{{ summary[key] }}</strong>
+  </a>
+  {% endfor %}
+</div>
+
+<section class="panel ledger-panel" aria-labelledby="ledger-title">
+  <div class="panel-head">
+    <div class="panel-head-main">
+      <h2 class="panel-title" id="ledger-title">{{ icon("list") }} Appointment records</h2>
+      <p class="panel-sub">{{ total }} record{{ '' if total == 1 else 's' }} match the current filters · sorted by {{ filters.sort|replace('_', ' ') }} {{ filters.dir }}.</p>
+    </div>
+    <div class="date-nav" aria-label="Move between dates">
+      <a class="icon-btn" href="{{ ledger_url(date=nav_prev, period='all', from='', to='', page=1) }}" aria-label="Previous day">{{ icon("chevron-left") }}</a>
+      <span class="date-nav-label">{{ active_date }}</span>
+      <a class="icon-btn" href="{{ ledger_url(date=nav_next, period='all', from='', to='', page=1) }}" aria-label="Next day">{{ icon("chevron-right") }}</a>
+    </div>
+  </div>
+
+  <form class="ledger-filters" method="get" action="{{ url_for('appointment_ledger') }}">
+    <input type="hidden" name="sort" value="{{ filters.sort }}">
+    <input type="hidden" name="dir" value="{{ filters.dir }}">
+    <label class="ledger-filter ledger-filter--search">
+      <span>Patient name or ID</span>
+      <span class="search">
+        {{ icon("search") }}
+        <input type="search" name="q" value="{{ filters.q }}" placeholder="e.g. Aarav or 1042" autocomplete="off">
+      </span>
+    </label>
+    <label class="ledger-filter">
+      <span>Doctor</span>
+      <select class="select" name="doctor_id">
+        <option value="">All doctors</option>
+        {% for d in doctors %}
+        <option value="{{ d.doctor_id }}" {{ 'selected' if filters.doctor_id == d.doctor_id }}>{{ d.full_name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="ledger-filter">
+      <span>Status</span>
+      <select class="select" name="status">
+        <option value="">All statuses</option>
+        {% for status in STATUSES %}
+        <option value="{{ status }}" {{ 'selected' if filters.status == status }}>{{ STATUS_LABEL[status] }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="ledger-filter">
+      <span>Period</span>
+      <select class="select" name="period">
+        <option value="all" {{ 'selected' if filters.period == 'all' }}>All dates</option>
+        <option value="past" {{ 'selected' if filters.period == 'past' }}>Past</option>
+        <option value="today" {{ 'selected' if filters.period == 'today' }}>Today</option>
+        <option value="upcoming" {{ 'selected' if filters.period == 'upcoming' }}>Upcoming</option>
+      </select>
+    </label>
+    <label class="ledger-filter ledger-filter--date">
+      <span>Exact date</span>
+      <input class="input" type="date" name="date" value="{{ filters.date.isoformat() if filters.date else '' }}">
+    </label>
+    <label class="ledger-filter ledger-filter--date">
+      <span>From</span>
+      <input class="input" type="date" name="from" value="{{ filters.from_date.isoformat() if filters.from_date else '' }}">
+    </label>
+    <label class="ledger-filter ledger-filter--date">
+      <span>To</span>
+      <input class="input" type="date" name="to" value="{{ filters.to_date.isoformat() if filters.to_date else '' }}">
+    </label>
+    <div class="ledger-filter-actions">
+      <button class="btn btn--primary btn--sm" type="submit">{{ icon("filter") }} Apply</button>
+      <a class="btn btn--ghost btn--sm" href="{{ url_for('appointment_ledger') }}">Clear</a>
+    </div>
+  </form>
+
+  {% if rows %}
+  <div class="table-wrap ledger-table-wrap" tabindex="0" role="region" aria-label="All appointments">
+    <table class="data-table ledger-table" id="ledger-table">
+      <caption class="sr-only">All appointments from the clinic database</caption>
+      <thead>
+        <tr>
+          <th scope="col">{{ sort_header('Appointment ID', 'appointment_id') }}</th>
+          <th scope="col">{{ sort_header('Date', 'appointment_datetime') }}</th>
+          <th scope="col">Time</th>
+          <th scope="col">{{ sort_header('Patient name', 'patient_name') }}</th>
+          <th scope="col">{{ sort_header('Doctor name', 'doctor_name') }}</th>
+          <th scope="col">{{ sort_header('Department', 'department') }}</th>
+          <th scope="col">{{ sort_header('Status', 'status') }}</th>
+          <th scope="col" class="actions-col"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in rows %}
+        {% set next_step = {'BOOKED': ('WAITING', 'Check in'), 'WAITING': ('IN_PROGRESS', 'Start'), 'IN_PROGRESS': ('COMPLETED', 'Complete')}.get(a.status) %}
+        {% set row_next = request.full_path.rstrip('?') %}
+        <tr class="{{ 'is-today' if a.appointment_datetime.date() == today }}" data-status="{{ a.status }}">
+          <td><span class="mono">#{{ a.appointment_id }}</span></td>
+          <td>
+            <span class="cell-main nowrap">{{ a.appointment_datetime.strftime('%d %b %Y') }}</span>
+            {% if a.appointment_datetime.date() == today %}<span class="today-tag">Today</span>{% endif %}
+          </td>
+          <td>
+            <span class="cell-main nowrap">{{ a.appointment_datetime.strftime('%H:%M') }}</span>
+            <span class="cell-sub">Token {{ a.token_no if a.token_no else '—' }}</span>
+          </td>
+          <td>
+            <div class="patient-cell">
+              <span class="avatar avatar--sm" aria-hidden="true">{{ a.patient_name|initials }}</span>
+              <div class="patient-cell-text">
+                <strong>{{ a.patient_name }}</strong>
+                <span>{{ a.phone }}</span>
+              </div>
+            </div>
+          </td>
+          <td><span class="cell-main">{{ a.doctor_name }}</span></td>
+          <td><span class="cell-sub">{{ a.department }}</span></td>
+          <td>{{ status_badge(a.status) }}</td>
+          <td class="actions-col">
+            <div class="row-actions">
+              <button class="btn btn--ghost btn--sm" type="button" data-ledger-detail
+                      data-appointment-id="{{ a.appointment_id }}"
+                      data-patient="{{ a.patient_name }}"
+                      data-phone="{{ a.phone }}"
+                      data-doctor="{{ a.doctor_name }}"
+                      data-department="{{ a.department }}"
+                      data-date="{{ a.appointment_datetime.strftime('%A, %d %B %Y') }}"
+                      data-time="{{ a.appointment_datetime.strftime('%H:%M') }}"
+                      data-token="{{ a.token_no if a.token_no else '—' }}"
+                      data-reason="{{ a.reason or 'No reason recorded' }}"
+                      data-status="{{ a.status }}"
+                      data-status-label="{{ a.status|status_label }}"
+                      data-can-manage="{{ '1' if can_manage else '0' }}"
+                      aria-label="View details for appointment {{ a.appointment_id }}">View</button>
+              {% if can_manage and next_step %}
+              <form method="post" action="{{ url_for('update_status', appointment_id=a.appointment_id) }}">
+                <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+                <input type="hidden" name="status" value="{{ next_step[0] }}">
+                <input type="hidden" name="next" value="{{ row_next }}">
+                <button class="btn btn--primary btn--sm" type="submit">{{ next_step[1] }}</button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="ledger-pagination">
+    <span>Showing {{ start_row }}–{{ end_row }} of {{ total }}</span>
+    {% if page_count > 1 %}
+    <div class="btn-group">
+      <a class="btn btn--secondary btn--sm {{ 'is-disabled' if page <= 1 }}" href="{{ ledger_url(page=page - 1 if page > 1 else 1) }}" aria-label="Previous page">{{ icon("chevron-left") }}</a>
+      <span class="pagination-label">Page {{ page }} of {{ page_count }}</span>
+      <a class="btn btn--secondary btn--sm {{ 'is-disabled' if page >= page_count }}" href="{{ ledger_url(page=page + 1 if page < page_count else page_count) }}" aria-label="Next page">{{ icon("chevron-right") }}</a>
+    </div>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="panel-body">
+    {{ empty_state("calendar", "No appointments match", "Try a different patient, doctor, status, or date range to see more records.", None, None) }}
+  </div>
+  {% endif %}
+</section>
+
+<dialog class="dialog" id="ledger-detail-dialog" aria-labelledby="ledger-detail-title"
+        data-status-base="{{ url_for('update_status', appointment_id=0) }}">
+  <div class="dialog-head">
+    <div>
+      <h2 class="dialog-title" id="ledger-detail-title">Appointment #<span data-detail="id"></span></h2>
+      <p class="dialog-sub">Live record from the clinic database.</p>
+    </div>
+    <button class="icon-btn dialog-close" type="button" data-dialog-close aria-label="Close">{{ icon("x") }}</button>
+  </div>
+  <div class="dialog-body">
+    <dl class="definition-list ledger-detail-list">
+      <div><dt>Patient</dt><dd data-detail="patient"></dd></div>
+      <div><dt>Phone</dt><dd data-detail="phone"></dd></div>
+      <div><dt>Doctor</dt><dd data-detail="doctor"></dd></div>
+      <div><dt>Department</dt><dd data-detail="department"></dd></div>
+      <div><dt>Date</dt><dd data-detail="date"></dd></div>
+      <div><dt>Time</dt><dd data-detail="time"></dd></div>
+      <div><dt>Token</dt><dd data-detail="token"></dd></div>
+      <div><dt>Reason</dt><dd data-detail="reason"></dd></div>
+      <div><dt>Status</dt><dd><span class="badge" data-detail="status-badge"></span></dd></div>
+    </dl>
+    <form method="post" id="ledger-detail-form" hidden>
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <input type="hidden" name="status" id="ledger-detail-status" value="">
+      <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
+      <button class="btn btn--primary btn--block" type="submit" id="ledger-detail-action"></button>
+    </form>
+  </div>
+</dialog>
+{% endblock %}

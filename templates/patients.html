@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, empty_state %}
+{% block title %}Patients{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head-main">
+    <p class="eyebrow">Patients</p>
+    <h1 class="page-title">Patient directory</h1>
+    <p class="page-sub">Every registered patient, their contact details, and the next action within reach.</p>
+  </div>
+  <div class="page-actions">
+    <button class="btn btn--secondary" type="button" data-print>{{ icon("printer") }}<span>Print list</span></button>
+    {% if can_manage %}
+    <button class="btn btn--primary" type="button" data-dialog-open="#patient-dialog">{{ icon("plus") }}<span>Register patient</span></button>
+    {% endif %}
+  </div>
+</div>
+
+<section class="kpi-grid" aria-label="Patient directory summary">
+  <article class="kpi-card">
+    <p class="kpi-label">Total patients</p>
+    <p class="kpi-value">{{ patient_total }}</p>
+    <p class="kpi-meta">Registered in the clinic</p>
+  </article>
+  <article class="kpi-card">
+    <p class="kpi-label">New this month</p>
+    <p class="kpi-value">{{ new_this_month }}</p>
+    <p class="kpi-meta">{{ today.strftime('%B %Y') }}</p>
+  </article>
+  <article class="kpi-card">
+    <p class="kpi-label">Showing now</p>
+    <p class="kpi-value">{{ patients|length }}</p>
+    <p class="kpi-meta">{{ 'Search results' if q else 'Most recent records' }}</p>
+  </article>
+  <article class="kpi-card">
+    <p class="kpi-label">Directory access</p>
+    <p class="kpi-value" style="font-size: 1.1rem">{{ 'Front desk' if can_manage else 'Read only' }}</p>
+    <p class="kpi-meta">{{ role|replace('_', ' ')|title if role else 'Local demo' }}</p>
+  </article>
+</section>
+
+<div class="directory-toolbar">
+  <form class="search" method="get" action="{{ url_for('patients') }}" role="search">
+    <label class="sr-only" for="patient-search">Search patients by name, phone, or ID</label>
+    {{ icon("search") }}
+    <input id="patient-search" type="search" name="q" value="{{ q }}" placeholder="Search by name, phone, or patient ID" autocomplete="off">
+    {% if q %}
+    <a class="search-clear" href="{{ url_for('patients') }}" aria-label="Clear search">{{ icon("x") }}</a>
+    {% endif %}
+  </form>
+  <p class="table-count">{% if q %}{{ patients|length }} result{{ '' if patients|length == 1 else 's' }} for “{{ q }}”{% else %}{{ patients|length }} patient{{ '' if patients|length == 1 else 's' }} shown{% endif %}</p>
+</div>
+
+{% if patients %}
+<div class="patient-directory">
+  <div class="table-wrap" tabindex="0" role="region" aria-label="Patient directory">
+    <table class="data-table">
+      <caption class="sr-only">Registered patients{% if q %} matching {{ q }}{% endif %}</caption>
+      <thead>
+        <tr>
+          <th scope="col">Patient</th>
+          <th scope="col">Contact</th>
+          <th scope="col">Profile</th>
+          <th scope="col">Registered</th>
+          <th scope="col" class="actions-col"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in patients %}
+        <tr>
+          <td>
+            <div class="patient-cell">
+              <span class="avatar" aria-hidden="true">{{ p.full_name|initials }}</span>
+              <div class="patient-cell-text">
+                <strong>{{ p.full_name }}</strong>
+                <span>Patient ID {{ p.patient_id }}</span>
+              </div>
+            </div>
+          </td>
+          <td>
+            <div class="contact-stack">
+              <span>{{ icon("phone") }} {{ p.phone }}</span>
+              {% if p.email %}<span>{{ icon("mail") }} {{ p.email }}</span>{% endif %}
+            </div>
+          </td>
+          <td>
+            <span class="cell-main">{{ p.date_of_birth.strftime('%d %b %Y') if p.date_of_birth else 'Date of birth not set' }}</span>
+            <span class="cell-sub">{{ p.gender or 'Gender not stated' }}</span>
+          </td>
+          <td class="text-sm muted">{{ p.created_at.strftime('%d %b %Y') if p.created_at else '—' }}</td>
+          <td class="actions-col">
+            <div class="row-actions">
+              <a class="btn btn--ghost btn--sm" href="{{ url_for('patient_edit', patient_id=p.patient_id) }}">Open</a>
+              {% if can_manage %}
+              <a class="btn btn--secondary btn--sm" href="{{ url_for('appointments', patient_id=p.patient_id) }}#book">Book</a>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% elif q %}
+<div class="panel">
+  {{ empty_state("search", "No patients match that search", "Try a different name, phone number, or patient ID, or clear the search to see the full directory.", url_for('patients'), "Clear search") }}
+</div>
+{% else %}
+<div class="panel">
+  {{ empty_state("users", "The patient directory is empty", "Register the first patient to start booking appointments and building the queue.", None, None) }}
+  {% if can_manage %}
+  <div class="empty-state empty-state--tight">
+    <button class="btn btn--primary" type="button" data-dialog-open="#patient-dialog">{{ icon("plus") }} Register first patient</button>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if can_manage %}
+<dialog class="dialog" id="patient-dialog" data-auto-open="{{ 'true' if open_form or request.args.get('open') == '1' else 'false' }}" aria-labelledby="patient-dialog-title">
+  <form method="post" action="{{ url_for('patients') }}">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+    <div class="dialog-head">
+      <div>
+        <h2 class="dialog-title" id="patient-dialog-title">Register a patient</h2>
+        <p class="dialog-sub">Create a clean record before the first appointment.</p>
+      </div>
+      <button class="icon-btn dialog-close" type="button" data-dialog-close aria-label="Close">{{ icon("x") }}</button>
+    </div>
+    <div class="dialog-body">
+      <div class="form">
+        <label class="field">
+          <span class="field-label">Full name <span class="required" aria-hidden="true">*</span></span>
+          <input class="input" name="full_name" maxlength="100" value="{{ form_data.get('full_name', '') }}" autocomplete="name" required>
+        </label>
+
+        <div class="field-grid">
+          <label class="field">
+            <span class="field-label">Phone <span class="required" aria-hidden="true">*</span></span>
+            <input class="input" name="phone" inputmode="numeric" pattern="[0-9]{7,15}" maxlength="15" value="{{ form_data.get('phone', '') }}" autocomplete="tel" required>
+            <span class="field-help">7 to 15 digits, numbers only.</span>
+          </label>
+          <label class="field">
+            <span class="field-label">Date of birth <span class="optional">Optional</span></span>
+            <input class="input" name="date_of_birth" type="date" max="{{ today.isoformat() }}" value="{{ form_data.get('date_of_birth', '') }}">
+          </label>
+        </div>
+
+        <div class="field-grid">
+          <label class="field">
+            <span class="field-label">Email <span class="optional">Optional</span></span>
+            <input class="input" name="email" type="email" maxlength="100" value="{{ form_data.get('email', '') }}" autocomplete="email">
+          </label>
+          <label class="field">
+            <span class="field-label">Gender <span class="optional">Optional</span></span>
+            <select class="select" name="gender">
+              <option value="">Not stated</option>
+              {% for option in ["Male", "Female", "Other"] %}
+              <option value="{{ option }}" {% if form_data.get('gender') == option %}selected{% endif %}>{{ option }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
+      </div>
+    </div>
+    <div class="dialog-foot">
+      <button class="btn btn--secondary" type="button" data-dialog-close>Cancel</button>
+      <button class="btn btn--primary" type="submit">{{ icon("plus") }} Register patient</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+{% endblock %}

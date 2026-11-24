@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, status_badge, empty_state %}
+{% block title %}Search{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head-main">
+    <p class="eyebrow">Global search</p>
+    <h1 class="page-title">Search the clinic</h1>
+    <p class="page-sub">Find patients, doctors, and appointments across the workspace.</p>
+  </div>
+</div>
+
+<section class="search-hero" aria-label="Search the clinic">
+  <form class="search-form-lg" method="get" action="{{ url_for('search') }}" role="search">
+    <label class="search" for="search-page-input">
+      <span class="sr-only">Search patients, doctors, or appointments</span>
+      {{ icon("search") }}
+      <input id="search-page-input" type="search" name="q" value="{{ q }}" placeholder="Search by patient name, doctor, phone, token, or reason" autocomplete="off" autofocus>
+    </label>
+    <button class="btn btn--primary" type="submit">{{ icon("search") }} Search</button>
+    {% if q %}<a class="btn btn--secondary" href="{{ url_for('search') }}">Clear</a>{% endif %}
+  </form>
+</section>
+
+{% if q %}
+<p class="toolbar-meta" style="margin-bottom: 14px">{{ result_count }} result{{ '' if result_count == 1 else 's' }} for “{{ q }}”.</p>
+
+{% if result_count %}
+<div class="result-section">
+  {% if patients %}
+  <section class="panel" aria-labelledby="search-patients-title">
+    <div class="panel-head">
+      <div class="panel-head-main">
+        <h2 class="panel-title" id="search-patients-title">{{ icon("users") }} Patients</h2>
+        <p class="panel-sub">{{ patients|length }} matching record{{ '' if patients|length == 1 else 's' }}.</p>
+      </div>
+    </div>
+    <div class="result-list">
+      {% for p in patients %}
+      <a class="result-item" href="{{ url_for('patient_edit', patient_id=p.patient_id) }}">
+        <span class="result-icon">{{ icon("user") }}</span>
+        <span class="result-main">
+          <strong>{{ p.full_name }}</strong>
+          <span>{{ p.phone }}{% if p.email %} · {{ p.email }}{% endif %}</span>
+        </span>
+        <span class="result-meta"><span class="token-pill">ID {{ p.patient_id }}</span></span>
+        {{ icon("chevron-right", "result-arrow") }}
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if doctors %}
+  <section class="panel" aria-labelledby="search-doctors-title">
+    <div class="panel-head">
+      <div class="panel-head-main">
+        <h2 class="panel-title" id="search-doctors-title">{{ icon("doctor") }} Doctors</h2>
+        <p class="panel-sub">{{ doctors|length }} matching clinician{{ '' if doctors|length == 1 else 's' }}.</p>
+      </div>
+    </div>
+    <div class="result-list">
+      {% for d in doctors %}
+      <a class="result-item" href="{{ url_for('queue_view', doctor_id=d.doctor_id) }}">
+        <span class="result-icon">{{ icon("doctor") }}</span>
+        <span class="result-main">
+          <strong>{{ d.full_name }}</strong>
+          <span>{{ d.specialization }}{% if d.phone %} · {{ d.phone }}{% endif %}</span>
+        </span>
+        <span class="result-meta"><span class="status-pill status-pill--available">Open queue</span></span>
+        {{ icon("chevron-right", "result-arrow") }}
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if appointments %}
+  <section class="panel" aria-labelledby="search-appointments-title">
+    <div class="panel-head">
+      <div class="panel-head-main">
+        <h2 class="panel-title" id="search-appointments-title">{{ icon("calendar") }} Appointments</h2>
+        <p class="panel-sub">{{ appointments|length }} matching appointment{{ '' if appointments|length == 1 else 's' }}.</p>
+      </div>
+    </div>
+    <div class="result-list">
+      {% for a in appointments %}
+      <a class="result-item" href="{{ url_for('appointments', date=a.appointment_datetime.date().isoformat()) }}">
+        <span class="result-icon">{{ icon("calendar") }}</span>
+        <span class="result-main">
+          <strong>{{ a.patient_name }} with {{ a.doctor_name }}</strong>
+          <span>{{ a.appointment_datetime|dt }} · Token {{ a.token_no if a.token_no else '—' }}{% if a.reason %} · {{ a.reason }}{% endif %}</span>
+        </span>
+        <span class="result-meta">{{ status_badge(a.status) }}</span>
+        {{ icon("chevron-right", "result-arrow") }}
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+</div>
+{% else %}
+<div class="panel">
+  {{ empty_state("search", "No matches for that search", "Try a patient name, doctor, phone number, token, or visit reason. You can also browse the patient directory directly.", url_for('patients'), "Open patient directory") }}
+</div>
+{% endif %}
+
+{% else %}
+<div class="panel">
+  <div class="panel-head">
+    <div class="panel-head-main">
+      <h2 class="panel-title">{{ icon("sparkles") }} Start typing to search</h2>
+      <p class="panel-sub">Search covers patient names and phone numbers, doctors and specializations, plus appointment reasons and token numbers.</p>
+    </div>
+  </div>
+  <div class="panel-body">
+    <div class="help-links">
+      <a class="quick-action" href="{{ url_for('patients') }}">{{ icon("users") }}<span>Browse patients</span>{{ icon("arrow-right") }}</a>
+      <a class="quick-action" href="{{ url_for('appointments') }}">{{ icon("calendar") }}<span>Browse the schedule</span>{{ icon("arrow-right") }}</a>
+      <a class="quick-action" href="{{ url_for('doctors') }}">{{ icon("doctor") }}<span>View the care team</span>{{ icon("arrow-right") }}</a>
+      <a class="quick-action" href="{{ url_for('queue_select') }}">{{ icon("queue") }}<span>Open live queues</span>{{ icon("arrow-right") }}</a>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

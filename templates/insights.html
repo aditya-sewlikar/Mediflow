@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, empty_state %}
+{% block title %}Insights{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head-main">
+    <p class="eyebrow">Insights</p>
+    <h1 class="page-title">Clinic insights</h1>
+    <p class="page-sub">{{ range_start.strftime('%d %b') }} – {{ range_end.strftime('%d %b %Y') }} · Demand, throughput, and doctor workload from real appointment records.</p>
+  </div>
+  <div class="page-actions">
+    <div class="segmented" aria-label="Insight range">
+      <a class="{{ 'is-active' if range_days == 7 }}" href="{{ url_for('insights', range=7) }}">7 days</a>
+      <a class="{{ 'is-active' if range_days == 30 }}" href="{{ url_for('insights', range=30) }}">30 days</a>
+    </div>
+    <button class="btn btn--secondary no-print" type="button" data-print>{{ icon("printer") }}<span>Print</span></button>
+  </div>
+</div>
+
+<section class="kpi-grid" aria-label="Insight summary">
+  <article class="kpi-card">
+    <p class="kpi-label">Total appointments</p>
+    <p class="kpi-value">{{ total }}</p>
+    <p class="kpi-meta">{{ avg_per_day }} per day on average</p>
+  </article>
+  <article class="kpi-card">
+    <p class="kpi-label">Completion rate</p>
+    <p class="kpi-value">{{ completion_rate }}%</p>
+    <p class="kpi-meta">{{ completed }} completed visits</p>
+  </article>
+  <article class="kpi-card">
+    <p class="kpi-label">New patients</p>
+    <p class="kpi-value">{{ new_patients }}</p>
+    <p class="kpi-meta">Registered in this period</p>
+  </article>
+  <article class="kpi-card">
+    <p class="kpi-label">Busiest hour</p>
+    <p class="kpi-value">{{ busiest_hour }}</p>
+    <p class="kpi-meta">Across the selected range</p>
+  </article>
+</section>
+
+<div class="insights-grid">
+  <section class="panel" aria-labelledby="volume-title">
+    <div class="panel-head">
+      <div class="panel-head-main">
+        <h2 class="panel-title" id="volume-title">{{ icon("chart") }} Appointment volume</h2>
+        <p class="panel-sub">Daily booked volume with completed visits highlighted.</p>
+      </div>
+      {% if busiest_day %}
+      <span class="chip">{{ icon("sparkles") }} Peak {{ busiest_day.full_label }} · {{ busiest_day.total }}</span>
+      {% endif %}
+    </div>
+    <div class="panel-body">
+      {% if total %}
+      <div class="chart-scroll">
+        <div class="volume-chart" role="img" aria-label="Daily appointment volume and completed visits">
+          {% for day in day_series %}
+          <div class="volume-col" title="{{ day.full_label }}: {{ day.total }} appointments, {{ day.completed }} completed">
+            <div class="volume-bar">
+              <span class="volume-total" style="height: {{ day.total_pct }}%"></span>
+              <span class="volume-done" style="height: {{ day.done_pct }}%"></span>
+            </div>
+            <span class="volume-label">{{ day.label }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="chart-legend">
+        <span><i class="legend-dot"></i> Scheduled</span>
+        <span><i class="legend-dot legend-dot--done"></i> Completed</span>
+      </div>
+      {% else %}
+      {{ empty_state("chart", "No activity in this range", "Book appointments or widen the date range to see clinic volume.", url_for('appointments') ~ '#book' if can_manage else None, "Book an appointment" if can_manage else None) }}
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="peak-title">
+    <div class="panel-head">
+      <div class="panel-head-main">
+        <h2 class="panel-title" id="peak-title">{{ icon("clock") }} Busiest hours</h2>
+        <p class="panel-sub">When the clinic tends to see the most patients.</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="peak-chart" role="img" aria-label="Appointment volume by hour of day">
+        {% for hour in peak_hours %}
+        <div class="peak-col{{ ' is-peak' if hour.is_peak }}" title="{{ hour.label }}:00 · {{ hour.total }} appointments">
+          <div class="peak-bar"><span style="height: {{ hour.pct }}%"></span></div>
+          <span class="peak-label">{{ hour.label }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="divider"></div>
+      <div class="insight">
+        {{ icon("info") }}
+        <span>
+          {% if busiest_hour != '—' %}
+          The busiest hour in this range is <strong>{{ busiest_hour }}</strong>. Consider keeping an extra front-desk hand available around that window.
+          {% else %}
+          There is not enough appointment data to identify a peak hour yet.
+          {% endif %}
+        </span>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="insights-bottom">
+  <section class="panel" aria-labelledby="status-mix-title">
+    <div class="panel-head">
+      <div class="panel-head-main">
+        <h2 class="panel-title" id="status-mix-title">{{ icon("activity") }} Status mix</h2>
+        <p class="panel-sub">Every appointment in the period, counted once.</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="distribution">
+        {% for row in status_rows %}
+        {% set pct = ((row.total / total) * 100)|round|int if total else 0 %}
+        <div class="dist-row" data-status="{{ row.status }}">
+          <div class="dist-head">
+            <span>{{ row.label }}</span>
+            <strong>{{ row.total }} · {{ pct }}%</strong>
+          </div>
+          <div class="progress" aria-label="{{ row.label }}: {{ row.total }} of {{ total }} appointments">
+            <span style="width: {{ pct }}%"></span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="workload-title">
+    <div class="panel-head">
+      <div class="panel-head-main">
+        <h2 class="panel-title" id="workload-title">{{ icon("doctor") }} Doctor workload</h2>
+        <p class="panel-sub">Patients, appointments and completion rate per clinician.</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      {% if doctor_rows %}
+      <div class="leaderboard">
+        {% for d in doctor_rows %}
+        <div class="leaderboard-row">
+          <span class="avatar avatar--sm avatar--doctor" aria-hidden="true">{{ d.full_name|initials }}</span>
+          <div class="leaderboard-main">
+            <strong>{{ d.full_name }}</strong>
+            <span>{{ d.specialization }} · {{ d.patient_count }} patient{{ '' if d.patient_count == 1 else 's' }} · {{ d.completion_rate }}% completed</span>
+          </div>
+          <div class="leaderboard-value">
+            {{ d.total }}
+            <span>visit{{ '' if d.total == 1 else 's' }}</span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      {{ empty_state("doctor", "No doctor activity yet", "Add doctors and book appointments to see workload insights.", url_for('doctors') if can_manage else None, "Add a doctor" if can_manage else None) }}
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}

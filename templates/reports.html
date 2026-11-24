@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, status_badge, empty_state %}
+{% block title %}Daily report{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head-main">
+    <p class="eyebrow">Insight</p>
+    <h1 class="page-title">Daily report</h1>
+    <p class="page-sub">{{ 'All recorded appointments' if range == 'all' else day.strftime('%A, %d %B %Y') }} · A reconciled view of demand, completions, and cancellations.</p>
+  </div>
+  <div class="page-actions">
+    <div class="segmented" aria-label="Report range">
+      <a class="{{ 'is-active' if range == 'day' }}" href="{{ url_for('reports', date=day.isoformat()) }}">Selected day</a>
+      <a class="{{ 'is-active' if range == 'all' }}" href="{{ url_for('reports', range='all') }}">All time</a>
+    </div>
+    <div class="date-nav" aria-label="Change report date">
+      <a class="icon-btn" href="{{ url_for('reports', date=prev_day) }}" aria-label="Previous day">{{ icon("chevron-left") }}</a>
+      <span class="date-nav-label">{{ day.strftime('%a %d %b') }}</span>
+      <a class="icon-btn" href="{{ url_for('reports', date=next_day) }}" aria-label="Next day">{{ icon("chevron-right") }}</a>
+    </div>
+    <form class="date-picker" method="get" action="{{ url_for('reports') }}">
+      <label class="sr-only" for="report-date">Report date</label>
+      <input class="input" id="report-date" type="date" name="date" value="{{ day.isoformat() }}">
+      <button class="btn btn--secondary btn--sm" type="submit">Show</button>
+    </form>
+    <button class="btn btn--secondary no-print" type="button" data-print>{{ icon("printer") }}<span>Print</span></button>
+  </div>
+</div>
+
+{# Keep the report shell visible even on an empty day so doctor-wise statistics
+   are still available (as honest zeroes) instead of disappearing entirely. #}
+{% if by_doctor or total %}
+<section class="report-summary" aria-label="Report summary">
+  <div class="report-hero">
+    <p class="report-hero-label">Completion rate</p>
+    <p class="report-hero-value">{{ completion_rate }}<small>%</small></p>
+    <p class="report-hero-sub">{{ completed }} of {{ total }} appointments completed {{ 'across all recorded visits' if range == 'all' else 'on ' ~ day.strftime('%d %b %Y') }}.</p>
+  </div>
+  <div class="report-summary-body">
+    <div class="report-fact">
+      <span>Total</span>
+      <strong>{{ total }}</strong>
+      <em>appointments</em>
+    </div>
+    <div class="report-fact">
+      <span>Completed</span>
+      <strong>{{ completed }}</strong>
+      <em>{{ completion_rate }}% of the {{ 'period' if range == 'all' else 'day' }}</em>
+    </div>
+    <div class="report-fact">
+      <span>Cancelled</span>
+      <strong>{{ cancelled }}</strong>
+      <em>{{ cancelled_rate }}% of the {{ 'period' if range == 'all' else 'day' }}</em>
+    </div>
+  </div>
+</section>
+
+<div class="report-grid">
+  <section class="panel" aria-labelledby="distribution-title">
+    <div class="panel-head">
+      <div>
+        <h2 class="panel-title" id="distribution-title">Status distribution</h2>
+        <p class="panel-sub">Every appointment counted once.</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="distribution">
+        {% for row in status_rows %}
+        {% set pct = (((row.total / total) * 100)|round|int) if total else 0 %}
+        <div class="dist-row" data-status="{{ row.status }}">
+          <div class="dist-head">
+            <span>{{ row.label }}</span>
+            <strong>{{ row.total }} · {{ pct }}%</strong>
+          </div>
+          <div class="progress" aria-label="{{ row.label }}: {{ row.total }} of {{ total }} appointments">
+            <span style="width: {{ pct }}%"></span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="divider"></div>
+      <div class="insight">
+        {{ icon("trend") }}
+        <span>
+          {% set period = 'period' if range == 'all' else 'day' %}
+          {% if not total %}
+          No appointments are recorded for this {{ period }} yet.
+          {% elif completion_rate >= 80 %}
+          A strong {{ period }}: most of the schedule has been completed.
+          {% elif completion_rate >= 50 %}
+          The {{ period }} is moving steadily. {{ total - completed - cancelled }} appointment{{ '' if total - completed - cancelled == 1 else 's' }} remain open.
+          {% else %}
+          {{ total - completed }} appointment{{ '' if total - completed == 1 else 's' }} still need attention this {{ period }}.
+          {% endif %}
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="doctor-report-title">
+    <div class="panel-head">
+      <div>
+        <h2 class="panel-title" id="doctor-report-title">By doctor</h2>
+        <p class="panel-sub">Patient volume and completion performance across the care team.</p>
+      </div>
+    </div>
+    <div class="panel-body panel-body--flush">
+      <div class="table-wrap" tabindex="0" role="region" aria-label="Report by doctor">
+        <table class="data-table report-table">
+          <caption class="sr-only">Appointments by doctor {{ 'across all recorded visits' if range == 'all' else 'on ' ~ day.strftime('%d %B %Y') }}</caption>
+          <thead>
+            <tr>
+              <th scope="col">Doctor</th>
+              <th scope="col" class="num">Patients</th>
+              <th scope="col" class="num">Total</th>
+              <th scope="col" class="num">Completed</th>
+              <th scope="col" class="num">Cancelled</th>
+              <th scope="col" class="num">Open</th>
+              <th scope="col">Completion</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in by_doctor %}
+            <tr>
+              <td>
+                <span class="cell-main">{{ r.doctor_name }}</span>
+                <span class="cell-sub">{{ r.specialization }}</span>
+              </td>
+              <td class="num">{{ r.patient_count }}</td>
+              <td class="num">{{ r.total }}</td>
+              <td class="num">{{ r.completed }}</td>
+              <td class="num">{{ r.cancelled }}</td>
+              <td class="num">{{ r.open_count }}</td>
+              <td>
+                <div class="meter">
+                  <div class="progress progress--success" aria-label="{{ r.doctor_name }} completion: {{ r.completion_rate }}%">
+                    <span style="width: {{ r.completion_rate }}%"></span>
+                  </div>
+                  <span class="meter-value">{{ r.completion_rate }}%</span>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<section class="panel" aria-labelledby="detail-title">
+  <div class="panel-head">
+    <div>
+      <h2 class="panel-title" id="detail-title">All appointments</h2>
+      <p class="panel-sub">{{ detail|length }} record{{ '' if detail|length == 1 else 's' }}, ordered by doctor and token.</p>
+    </div>
+    <a class="btn btn--ghost btn--sm no-print" href="{{ url_for('appointments', date=day.isoformat()) }}">Open schedule {{ icon("arrow-right") }}</a>
+  </div>
+  <div class="panel-body panel-body--flush">
+    <div class="table-wrap" tabindex="0" role="region" aria-label="All appointments for the report date">
+      <table class="data-table">
+        <caption class="sr-only">All appointments for {{ day.strftime('%d %B %Y') }}</caption>
+        <thead>
+          <tr>
+            <th scope="col">Doctor</th>
+            <th scope="col">Token</th>
+            <th scope="col">Time</th>
+            <th scope="col">Patient</th>
+            <th scope="col">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in detail %}
+          <tr>
+            <td>{{ r.doctor_name }}</td>
+            <td><span class="mono">{{ r.token_no if r.token_no else '—' }}</span></td>
+            <td>{{ r.appointment_datetime|hm }}</td>
+            <td>{{ r.patient_name }}</td>
+            <td>{{ status_badge(r.status) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% else %}
+<div class="panel">
+  {{ empty_state("chart", "Nothing to report yet", "Pick another day above, or add a doctor and book appointments to start building the report.", url_for('appointments', date=day.isoformat()) ~ '#book' if can_manage else None, "Book an appointment" if can_manage else None) }}
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,200 @@
+{% macro icon(name, class_name="icon") -%}
+<svg class="{{ class_name }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  {%- if name == "dashboard" -%}
+  <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
+  {%- elif name == "queue" -%}
+  <path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/>
+  {%- elif name == "calendar" -%}
+  <rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>
+  {%- elif name == "users" -%}
+  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+  {%- elif name == "doctor" -%}
+  <path d="M4.8 4.6a4 4 0 0 1 5.7 0l1.5 1.5 1.5-1.5a4 4 0 1 1 5.7 5.7l-1.5 1.5a8.5 8.5 0 0 1-2.2 7.3"/><path d="M14.5 6.1a4 4 0 0 1 5.7 5.7l-1.5 1.5a8.5 8.5 0 0 1-2 .2"/><path d="M8.5 12v1.5a3.5 3.5 0 0 0 7 0V13"/><path d="M12 17v4"/>
+  {%- elif name == "chart" -%}
+  <path d="M3 3v18h18"/><path d="M7 16v-4M12 16V8M17 16V5"/>
+  {%- elif name == "insights" -%}
+  <path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/>
+  {%- elif name == "plus" -%}
+  <path d="M12 5v14M5 12h14"/>
+  {%- elif name == "search" -%}
+  <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
+  {%- elif name == "arrow-left" -%}
+  <path d="M19 12H5M12 19l-7-7 7-7"/>
+  {%- elif name == "arrow-right" -%}
+  <path d="M5 12h14M12 5l7 7-7 7"/>
+  {%- elif name == "arrow-up-right" -%}
+  <path d="M7 17 17 7"/><path d="M7 7h10v10"/>
+  {%- elif name == "chevron-right" -%}
+  <path d="m9 18 6-6-6-6"/>
+  {%- elif name == "chevron-left" -%}
+  <path d="m15 18-6-6 6-6"/>
+  {%- elif name == "chevron-down" -%}
+  <path d="m6 9 6 6 6-6"/>
+  {%- elif name == "menu" -%}
+  <path d="M4 7h16M4 12h16M4 17h16"/>
+  {%- elif name == "x" -%}
+  <path d="M18 6 6 18M6 6l12 12"/>
+  {%- elif name == "check" -%}
+  <path d="m20 6-11 11-5-5"/>
+  {%- elif name == "check-circle" -%}
+  <circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/>
+  {%- elif name == "alert" -%}
+  <path d="M10.3 3.7 1.9 18a2 2 0 0 0 1.7 3h16.8a2 2 0 0 0 1.7-3L13.7 3.7a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>
+  {%- elif name == "info" -%}
+  <circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>
+  {%- elif name == "clock" -%}
+  <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+  {%- elif name == "phone" -%}
+  <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.9a2 2 0 0 1-.4 2.1L8.1 10a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.9.6 2.9.7a2 2 0 0 1 1.6 1.9Z"/>
+  {%- elif name == "mail" -%}
+  <rect x="2.5" y="4" width="19" height="16" rx="2"/><path d="m3 6 9 6 9-6"/>
+  {%- elif name == "bell" -%}
+  <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>
+  {%- elif name == "settings" -%}
+  <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/>
+  {%- elif name == "help" -%}
+  <circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2.5-3 4"/><path d="M12 17h.01"/>
+  {%- elif name == "life-buoy" -%}
+  <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="m4.9 4.9 4.2 4.2M14.9 14.9l4.2 4.2M19.1 4.9l-4.2 4.2M9.1 14.9l-4.2 4.2"/>
+  {%- elif name == "more" -%}
+  <circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>
+  {%- elif name == "trend-up" -%}
+  <path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/>
+  {%- elif name == "trend-down" -%}
+  <path d="m3 7 6 6 4-4 8 8"/><path d="M15 17h6v-6"/>
+  {%- elif name == "minus" -%}
+  <path d="M5 12h14"/>
+  {%- elif name == "printer" -%}
+  <path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="7" rx="1"/>
+  {%- elif name == "maximize" -%}
+  <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>
+  {%- elif name == "refresh" -%}
+  <path d="M21 12a9 9 0 0 1-15.5 6.2M3 12a9 9 0 0 1 15.5-6.2"/><path d="M21 3v6h-6M3 21v-6h6"/>
+  {%- elif name == "pause" -%}
+  <path d="M6 5h4v14H6zM14 5h4v14h-4z"/>
+  {%- elif name == "play" -%}
+  <path d="M8 5v14l11-7z"/>
+  {%- elif name == "user" -%}
+  <circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>
+  {%- elif name == "logout" -%}
+  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/>
+  {%- elif name == "activity" -%}
+  <path d="M22 12h-4l-3 8-6-16-3 8H2"/>
+  {%- elif name == "heart-pulse" -%}
+  <path d="M19 14c1.5-1.5 3-3.4 3-5.5A4.5 4.5 0 0 0 12 5 4.5 4.5 0 0 0 2 8.5c0 2.1 1.5 4 3 5.5l7 7Z"/><path d="M3.2 12H8l1.5-3 2.5 6 1.5-3h4.3"/>
+  {%- elif name == "lock" -%}
+  <rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>
+  {%- elif name == "eye" -%}
+  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
+  {%- elif name == "eye-off" -%}
+  <path d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.2A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.1 4.1M6.1 6.1C3.5 7.8 2 12 2 12s3.5 7 10 7a10.9 10.9 0 0 0 4.2-.8"/>
+  {%- elif name == "calendar-plus" -%}
+  <rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M12 14v4M10 16h4"/>
+  {%- elif name == "list" -%}
+  <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
+  {%- elif name == "trend" -%}
+  <path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/>
+  {%- elif name == "building" -%}
+  <path d="M4 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"/><path d="M16 9h3a2 2 0 0 1 2 2v10M8 7h4M8 11h4M8 15h4M8 19h4M2 21h20"/>
+  {%- elif name == "shield" -%}
+  <path d="M12 22s8-3.5 8-10V5l-8-3-8 3v7c0 6.5 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>
+  {%- elif name == "sliders" -%}
+  <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/>
+  {%- elif name == "database" -%}
+  <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/>
+  {%- elif name == "keyboard" -%}
+  <rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M10 14h4"/>
+  {%- elif name == "external" -%}
+  <path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+  {%- elif name == "download" -%}
+  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>
+  {%- elif name == "filter" -%}
+  <path d="M22 3H2l8 9.5V19l4 2v-8.5L22 3Z"/>
+  {%- elif name == "send" -%}
+  <path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>
+  {%- elif name == "copy" -%}
+  <rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+  {%- elif name == "sparkles" -%}
+  <path d="m12 3 1.9 4.8L19 9.7l-4.5 2.6L12 17l-2.5-4.7L5 9.7l5.1-1.9Z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8Z"/>
+  {%- elif name == "dot" -%}
+  <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/>
+  {%- else -%}
+  <circle cx="12" cy="12" r="9"/>
+  {%- endif -%}
+</svg>
+{%- endmacro %}
+
+{% macro status_badge(status) -%}
+<span class="badge" data-status="{{ status }}">{{ status|status_label }}</span>
+{%- endmacro %}
+
+{% macro flash_messages() -%}
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="flash-region" aria-label="Notifications" data-flash-region>
+  {% for category, message in messages %}
+  {% set tone = "error" if category in ("error", "danger") else ("ok" if category in ("ok", "success") else "info") %}
+  <div class="flash flash--{{ tone }}" role="{{ 'alert' if tone == 'error' else 'status' }}" data-flash>
+    {{ icon("alert" if tone == "error" else ("check-circle" if tone == "ok" else "info"), "icon") }}
+    <span>{{ message }}</span>
+    <button class="flash-close" type="button" data-flash-close aria-label="Dismiss notification">{{ icon("x") }}</button>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+{%- endmacro %}
+
+{% macro doctor_queue_card(d) -%}
+<article class="queue-card">
+  <div class="queue-card-head">
+    <div class="queue-doctor">
+      <span class="avatar avatar--sm avatar--doctor" aria-hidden="true">{{ d.full_name|initials }}</span>
+      <div class="identity-text">
+        <span class="identity-name">{{ d.full_name }}</span>
+        <span class="identity-meta">{{ d.specialization }}</span>
+      </div>
+    </div>
+    <span class="status-pill status-pill--{{ d.state }}">{{ d.state_label }}</span>
+  </div>
+
+  <div class="queue-slots">
+    <div>
+      <span class="slot-label">Now serving</span>
+      <div class="slot-main">
+        <span class="token-chip {{ 'is-empty' if not d.serving_token }}">{{ d.serving_token if d.serving_token else '—' }}</span>
+        <span class="slot-name {{ 'is-empty' if not d.serving_patient }}">{{ d.serving_patient if d.serving_patient else 'No visit in progress' }}</span>
+      </div>
+    </div>
+    <div>
+      <span class="slot-label">Up next</span>
+      <div class="slot-main">
+        <span class="token-chip {{ 'is-empty' if not d.next_token }}">{{ d.next_token if d.next_token else '—' }}</span>
+        <span class="slot-name {{ 'is-empty' if not d.next_patient }}">{{ d.next_patient if d.next_patient else 'Nobody waiting' }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="queue-meta">
+    <span>{{ icon("queue") }} <strong>{{ d.waiting }}</strong> waiting</span>
+    <span>{{ icon("clock") }} {{ (d.avg_wait ~ ' min avg') if d.avg_wait is not none else 'No wait yet' }}</span>
+    <span>{{ icon("calendar") }} <strong>{{ d.booked }}</strong> booked</span>
+    <span>{{ icon("users") }} <strong>{{ d.patient_count }}</strong> patients</span>
+  </div>
+
+  <a class="btn btn--secondary btn--sm" href="{{ url_for('queue_view', doctor_id=d.doctor_id) }}">
+    {{ icon("queue") }}<span>Open queue</span>{{ icon("arrow-right") }}
+  </a>
+</article>
+{%- endmacro %}
+
+{% macro empty_state(icon_name, title, text, action_url=None, action_label=None) -%}
+<div class="empty-state">
+  <span class="empty-icon">{{ icon(icon_name, "icon") }}</span>
+  <p class="empty-title">{{ title }}</p>
+  <p class="empty-text">{{ text }}</p>
+  {% if action_url and action_label %}
+  <a class="btn btn--secondary btn--sm" href="{{ action_url }}">{{ action_label }}</a>
+  {% endif %}
+</div>
+{%- endmacro %}

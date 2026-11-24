@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, status_badge, empty_state, doctor_queue_card %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="page-head page-head--dashboard">
+  <div class="page-head-main">
+    <p class="eyebrow">Dashboard</p>
+    <h1 class="page-title">{{ greeting }}, {{ greeting_name }}</h1>
+    <p class="page-sub">{{ today.strftime('%A, %d %B %Y') }} · Here is the live picture of today's patients, consultations, and schedule.</p>
+  </div>
+  <div class="page-actions">
+    {% if can_manage %}
+    <a class="btn btn--primary" href="{{ url_for('appointments') }}#book">{{ icon("calendar-plus") }}<span>New appointment</span></a>
+    {% endif %}
+    <a class="btn btn--secondary" href="{{ url_for('queue_select') }}">{{ icon("queue") }}<span>Open queue board</span></a>
+  </div>
+</div>
+
+<section class="stat-grid" aria-label="Today's key statistics">
+  {% for stat in stats %}
+  {% set trend_icon = "trend-up" if stat.change.direction == "up" else ("trend-down" if stat.change.direction == "down" else "minus") %}
+  <article class="stat-card{{ ' stat-card--' ~ stat.tone if stat.tone in ('orange', 'teal', 'green') else '' }}">
+    <div class="stat-card-top">
+      <span class="stat-icon" aria-hidden="true">{{ icon(stat.icon) }}</span>
+      <span class="trend trend--{{ stat.change.tone }}" title="Compared with yesterday">
+        {{ icon(trend_icon) }}<span>{{ stat.change.text }}</span>
+      </span>
+    </div>
+    <p class="stat-value">{{ stat.value }}</p>
+    <p class="stat-label">{{ stat.label }}</p>
+    <p class="stat-compare">{{ stat.compare }}</p>
+  </article>
+  {% endfor %}
+</section>
+
+<div class="dashboard-layout">
+  <div class="dashboard-main">
+    <section class="panel" aria-labelledby="live-queues-title">
+      <div class="panel-head">
+        <div class="panel-head-main">
+          <h2 class="panel-title" id="live-queues-title">{{ icon("activity") }} Live patient queue</h2>
+          <p class="panel-sub">Current token, next patient, and waiting load for every doctor.</p>
+        </div>
+        <a class="btn btn--ghost btn--sm" href="{{ url_for('queue_select') }}">Queue board {{ icon("arrow-right") }}</a>
+      </div>
+      <div class="panel-body">
+        {% if queue_summary %}
+        <div class="live-grid">
+          {% for d in queue_summary %}
+          {{ doctor_queue_card(d) }}
+          {% endfor %}
+        </div>
+        {% else %}
+        {{ empty_state("doctor", "No doctors on the roster yet", "Add your care team to start building today's queue and appointment schedule.", url_for('doctors') if can_manage else None, "Add a doctor" if can_manage else None) }}
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="panel dashboard-ledger-card" aria-labelledby="dashboard-ledger-title">
+      <div class="panel-head">
+        <div class="panel-head-main">
+          <h2 class="panel-title" id="dashboard-ledger-title">{{ icon("list") }} Appointment management</h2>
+          <p class="panel-sub">The full appointment register — past, today, and upcoming — with search, filters, sorting, and pagination.</p>
+        </div>
+        <a class="btn btn--secondary btn--sm" href="{{ url_for('appointment_ledger') }}">Open ledger {{ icon("arrow-right") }}</a>
+      </div>
+      <div class="panel-body">
+        <div class="ledger-mini-grid" aria-label="Appointment totals">
+          <a class="ledger-mini" href="{{ ledger_url(period='all', date='', from='', to='', page=1) }}"><span>All time</span><strong>{{ ledger_summary.total }}</strong></a>
+          <a class="ledger-mini" href="{{ ledger_url(period='past', date='', from='', to='', page=1) }}"><span>Past</span><strong>{{ ledger_summary.past }}</strong></a>
+          <a class="ledger-mini ledger-mini--today" href="{{ ledger_url(period='today', date='', from='', to='', page=1) }}"><span>Today</span><strong>{{ ledger_summary.today }}</strong></a>
+          <a class="ledger-mini" href="{{ ledger_url(period='upcoming', date='', from='', to='', page=1) }}"><span>Upcoming</span><strong>{{ ledger_summary.upcoming }}</strong></a>
+        </div>
+        <p class="hint">Open the ledger to review any appointment, filter by patient, doctor, status or date, and update a status in place.</p>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="upcoming-title">
+      <div class="panel-head">
+        <div class="panel-head-main">
+          <h2 class="panel-title" id="upcoming-title">{{ icon("calendar") }} Upcoming appointments</h2>
+          <p class="panel-sub">{{ appointment_count }} appointment{{ '' if appointment_count == 1 else 's' }} on today's schedule.</p>
+        </div>
+        <a class="btn btn--ghost btn--sm" href="{{ url_for('appointments') }}">Full schedule {{ icon("arrow-right") }}</a>
+      </div>
+
+      {% if appointments %}
+      <div class="table-tools">
+        <label class="search" for="dashboard-appointment-search">
+          <span class="sr-only">Search today's appointments</span>
+          {{ icon("search") }}
+          <input id="dashboard-appointment-search" type="search" placeholder="Search patient, doctor, or reason" autocomplete="off" data-table-filter="#upcoming-table">
+        </label>
+        <select class="select" aria-label="Filter by status" data-table-status="#upcoming-table">
+          <option value="">All statuses</option>
+          {% for status in STATUSES %}
+          <option value="{{ status }}">{{ STATUS_LABEL[status] }}</option>
+          {% endfor %}
+        </select>
+        <span class="table-count" data-table-count="#upcoming-table">{{ appointments|length }} shown</span>
+      </div>
+
+      <div class="table-wrap" tabindex="0" role="region" aria-label="Today's upcoming appointments">
+        <table class="data-table" id="upcoming-table">
+          <caption class="sr-only">Today's appointments</caption>
+          <thead>
+            <tr>
+              <th scope="col">Time</th>
+              <th scope="col">Patient</th>
+              <th scope="col">Doctor</th>
+              <th scope="col">Status</th>
+              <th scope="col" class="actions-col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in appointments %}
+            {% set next_step = {'BOOKED': ('WAITING', 'Check in'), 'WAITING': ('IN_PROGRESS', 'Start'), 'IN_PROGRESS': ('COMPLETED', 'Complete')}.get(a.status) %}
+            <tr data-status="{{ a.status }}" data-search="{{ (a.patient_name ~ ' ' ~ a.doctor_name ~ ' ' ~ (a.reason or '') ~ ' ' ~ (a.token_no or ''))|lower }}">
+              <td>
+                <span class="cell-main nowrap">{{ a.appointment_datetime|hm }}</span>
+                <span class="cell-sub">Token {{ a.token_no if a.token_no else '—' }}</span>
+              </td>
+              <td>
+                <div class="patient-cell">
+                  <span class="avatar avatar--sm" aria-hidden="true">{{ a.patient_name|initials }}</span>
+                  <div class="patient-cell-text">
+                    <strong>{{ a.patient_name }}</strong>
+                    <span>{{ a.reason or a.phone }}</span>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <span class="cell-main">{{ a.doctor_name }}</span>
+                <span class="cell-sub">{{ a.specialization }}</span>
+              </td>
+              <td>{{ status_badge(a.status) }}</td>
+              <td class="actions-col">
+                <div class="row-actions">
+                  {% if can_manage and next_step %}
+                  <form method="post" action="{{ url_for('update_status', appointment_id=a.appointment_id) }}">
+                    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+                    <input type="hidden" name="status" value="{{ next_step[0] }}">
+                    <input type="hidden" name="next" value="{{ url_for('index') }}">
+                    <button class="btn btn--primary btn--sm" type="submit">{{ next_step[1] }}</button>
+                  </form>
+                  {% else %}
+                  <a class="btn btn--ghost btn--sm" href="{{ url_for('patient_edit', patient_id=a.patient_id) }}">View patient</a>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="panel-foot">
+        <span>{{ icon("info") }} Use the search and status filter to narrow the schedule.</span>
+      </div>
+      {% else %}
+      {{ empty_state("calendar", "Today's schedule is clear", "No appointments have been booked yet. Create the first appointment to start today's list.", url_for('appointments') ~ '#book' if can_manage else None, "New appointment" if can_manage else None) }}
+      {% endif %}
+    </section>
+  </div>
+
+  <aside class="dashboard-side" aria-label="Performance and shortcuts">
+    <section class="panel performance-panel" aria-labelledby="performance-title">
+      <div class="panel-head">
+        <div class="panel-head-main">
+          <h2 class="panel-title" id="performance-title">{{ icon("chart") }} Today's performance</h2>
+          <p class="panel-sub">A live read on throughput and waiting time.</p>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="perf-ring-wrap">
+          <div class="ring" role="img" aria-label="Completion rate {{ completion_rate }} percent">
+            <svg viewBox="0 0 120 120" aria-hidden="true">
+              <circle class="ring-track" cx="60" cy="60" r="48"/>
+              <circle class="ring-value" cx="60" cy="60" r="48"
+                      stroke-dasharray="{{ (301.6 * completion_rate / 100)|round(1) }} 301.6"
+                      transform="rotate(-90 60 60)"/>
+            </svg>
+            <span class="ring-label"><strong>{{ completion_rate }}%</strong><span>completed</span></span>
+          </div>
+          <div class="perf-copy">
+            <strong>Completion rate</strong>
+            <span>{{ performance.completed }} of {{ performance.total }} appointments completed today.</span>
+          </div>
+        </div>
+
+        <div class="perf-stats">
+          <div class="perf-stat"><span>Total scheduled</span><strong>{{ performance.total }}</strong></div>
+          <div class="perf-stat perf-stat--green"><span>Completed</span><strong>{{ performance.completed }}</strong></div>
+          <div class="perf-stat perf-stat--orange"><span>Waiting</span><strong>{{ performance.waiting }}</strong></div>
+          <div class="perf-stat perf-stat--teal"><span>In consultation</span><strong>{{ performance.in_progress }}</strong></div>
+        </div>
+
+        <div>
+          <div class="flow-head">
+            <strong>Patient flow by hour</strong>
+            <span>Avg wait {{ performance.avg_wait_label }}</span>
+          </div>
+          <div class="flow-chart" role="img" aria-label="Appointment volume and completions by hour">
+            {% for f in flow %}
+            <div class="flow-col">
+              <div class="flow-bar">
+                <span class="flow-total" style="height: {{ f.total_pct }}%"></span>
+                <span class="flow-done" style="height: {{ f.done_pct }}%"></span>
+              </div>
+              <span class="flow-label">{{ f.label }}</span>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="flow-legend">
+            <span><i class="legend-dot"></i> Scheduled</span>
+            <span><i class="legend-dot legend-dot--done"></i> Completed</span>
+          </div>
+        </div>
+
+        <a class="performance-link" href="{{ url_for('insights') }}">Explore clinic insights {{ icon("arrow-right") }}</a>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="shortcuts-title">
+      <div class="panel-head panel-head--plain">
+        <div class="panel-head-main">
+          <h2 class="panel-title" id="shortcuts-title">{{ icon("sparkles") }} Quick actions</h2>
+          <p class="panel-sub">The tasks the front desk reaches for most.</p>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="quick-actions">
+          {% if can_manage %}
+          <a class="quick-action" href="{{ url_for('appointments') }}#book">{{ icon("calendar-plus") }}<span>Book an appointment</span>{{ icon("arrow-right") }}</a>
+          <a class="quick-action" href="{{ url_for('patients') }}?open=1">{{ icon("users") }}<span>Register a patient</span>{{ icon("arrow-right") }}</a>
+          {% endif %}
+          <a class="quick-action" href="{{ url_for('queue_select') }}">{{ icon("queue") }}<span>Open live queues</span>{{ icon("arrow-right") }}</a>
+          <a class="quick-action" href="{{ url_for('appointment_ledger') }}">{{ icon("list") }}<span>Review appointment ledger</span>{{ icon("arrow-right") }}</a>
+          <a class="quick-action" href="{{ url_for('reports') }}">{{ icon("chart") }}<span>Today's report</span>{{ icon("arrow-right") }}</a>
+        </div>
+      </div>
+    </section>
+  </aside>
+</div>
+{% endblock %}

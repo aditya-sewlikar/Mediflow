@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, flash_messages %}
+{% block title %}Sign in{% endblock %}
+{% block auth_content %}
+<div class="auth-shell">
+  <div class="auth-layout">
+    <section class="auth-brand" aria-label="About MediFlow">
+      <div>
+        <a class="brand" href="{{ url_for('login') }}" aria-label="MediFlow sign in">
+          <span class="brand-mark" aria-hidden="true">{{ icon("activity") }}</span>
+          <span class="brand-text">MediFlow<small>Clinic operations</small></span>
+        </a>
+
+        <div class="auth-copy">
+          <h1 class="auth-quote">Calm queues, <em>better care.</em></h1>
+          <p>A calm, private workspace for each clinic's appointments, live queues and patient records.</p>
+          <ul class="auth-features">
+            <li>Live token board for every doctor</li>
+            <li>Appointment booking with clash checks</li>
+            <li>Clear patient records and daily reports</li>
+          </ul>
+        </div>
+      </div>
+      <footer>MediFlow · multi-clinic platform · {{ now.year }}</footer>
+    </section>
+
+    <main class="auth-panel" id="main" tabindex="-1" aria-labelledby="login-title">
+      <p class="eyebrow">Clinic access</p>
+      <h2 id="login-title">Sign in to MediFlow</h2>
+      <p class="page-sub">Sign in as a clinic administrator, front-desk user or platform administrator.</p>
+
+      {{ flash_messages() }}
+
+      <form class="login-form" method="post" action="{{ url_for('login') }}{% if next_url and next_url != url_for('index') %}?next={{ next_url|urlencode }}{% endif %}">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+
+        <label class="field">
+          <span class="field-label">Username</span>
+          <input class="input" name="username" required autofocus autocomplete="username" autocapitalize="none" spellcheck="false">
+        </label>
+
+        <div class="field">
+          <label class="field-label" for="password">Password</label>
+          <div class="password-field">
+            <input class="input" id="password" name="password" type="password" required autocomplete="current-password">
+            <button class="password-toggle" type="button" data-password-toggle="#password" aria-label="Show password" aria-pressed="false">
+              {{ icon("eye") }}
+            </button>
+          </div>
+        </div>
+
+        <button class="btn btn--primary btn--lg btn--block" type="submit">Sign in</button>
+      </form>
+
+      <div class="auth-meta auth-meta--spaced">
+        <span>{{ icon("shield") }} Protected clinic workspace</span>
+        <span>CSRF protected</span>
+      </div>
+
+      <p class="auth-switch">New to MediFlow?
+        <a href="{{ url_for('signup', next=next_url) if next_url and next_url != url_for('index') else url_for('signup') }}">Register a clinic</a>
+      </p>
+      <p class="auth-legal">{% if login_enabled %}Registration creates a new clinic and its administrator. Existing platform administrators are unchanged.{% else %}Sign-in is disabled for this local demo environment.{% endif %}</p>
+    </main>
+  </div>
+</div>
+{% endblock %}

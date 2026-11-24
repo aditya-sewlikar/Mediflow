@@ -1,0 +1,306 @@
+/* ==========================================================================
+   MediFlow print styles
+   ========================================================================== */
+@page {
+  margin: 16mm;
+}
+
+@media print {
+  :root {
+    color-scheme: light;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    box-shadow: none !important;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  body {
+    font-family: "Inter", Arial, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.45;
+  }
+
+  .sidebar,
+  .topbar,
+  .sidebar-scrim,
+  .app-footer,
+  .skip-link,
+  .mobile-menu,
+  .page-actions,
+  .toolbar,
+  .queue-toolbar,
+  .flash-region,
+  .btn,
+  .icon-btn,
+  .dialog,
+  .search,
+  .date-nav,
+  .date-picker,
+  .quick-actions,
+  .closed-list summary,
+  .no-print {
+    display: none !important;
+  }
+
+  .app-shell,
+  body.queue-fullscreen .app-shell {
+    display: block !important;
+    min-height: 0;
+  }
+
+  .app-main,
+  .page {
+    display: block !important;
+    min-height: 0;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  h1,
+  h2,
+  h3,
+  .page-title,
+  .report-hero-value,
+  .report-fact strong {
+    color: #111 !important;
+  }
+
+  h1,
+  .page-title {
+    margin-bottom: 4mm;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 22pt;
+    letter-spacing: -0.02em;
+  }
+
+  h2 {
+    margin: 6mm 0 2mm;
+    font-size: 13pt;
+  }
+
+  a {
+    color: #111 !important;
+    text-decoration: none;
+  }
+
+  .page-head {
+    display: block !important;
+    margin-bottom: 5mm;
+  }
+
+  .panel,
+  .table-wrap,
+  .doctor-card,
+  .overview-card,
+  .queue-card,
+  .report-summary,
+  .error-card {
+    border: 1px solid #bbb !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    color: #111 !important;
+    break-inside: avoid;
+  }
+
+  .panel-head,
+  .panel-foot {
+    border-color: #bbb !important;
+    background: #fff !important;
+  }
+
+  .panel-head {
+    padding: 3mm 4mm;
+  }
+
+  .panel-body {
+    padding: 4mm;
+  }
+
+  .dashboard-grid,
+  .booking-layout,
+  .profile-grid,
+  .report-grid,
+  .doctor-grid,
+  .overview-grid,
+  .queue-grid {
+    display: block !important;
+  }
+
+  .dashboard-grid > *,
+  .booking-layout > *,
+  .profile-grid > *,
+  .report-grid > * {
+    margin-bottom: 6mm;
+  }
+
+  .status-strip {
+    grid-template-columns: repeat(5, 1fr) !important;
+    border: 1px solid #bbb !important;
+    background: #bbb !important;
+  }
+
+  .status-cell {
+    padding: 2mm 3mm !important;
+    background: #fff !important;
+  }
+
+  .status-cell strong {
+    font-size: 14pt !important;
+  }
+
+  .table-wrap {
+    overflow: visible !important;
+    break-inside: auto;
+  }
+
+  .data-table {
+    font-size: 9pt;
+  }
+
+  .data-table th {
+    background: #eee !important;
+    color: #111 !important;
+    border-color: #bbb !important;
+  }
+
+  .data-table td {
+    border-color: #ccc !important;
+  }
+
+  .data-table tr {
+    break-inside: avoid;
+  }
+
+  .data-table a {
+    text-decoration: none;
+  }
+
+  .badge {
+    border: 1px solid #999 !important;
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  .badge::before {
+    background: #111 !important;
+  }
+
+  .report-summary {
+    display: block !important;
+    border: 0 !important;
+  }
+
+  .report-hero,
+  .report-fact {
+    background: #fff !important;
+    color: #111 !important;
+    padding: 2mm 0 !important;
+  }
+
+  .report-hero-label,
+  .report-hero-sub,
+  .report-fact span,
+  .report-fact em {
+    color: #444 !important;
+  }
+
+  .report-summary-body {
+    display: flex !important;
+    gap: 10mm !important;
+    background: #fff !important;
+    border-top: 1px solid #bbb !important;
+    padding-top: 3mm;
+  }
+
+  .report-hero-value {
+    font-size: 30pt !important;
+  }
+
+  .progress {
+    border: 1px solid #999 !important;
+    background: #fff !important;
+    height: 4mm;
+  }
+
+  .progress > span {
+    background: #555 !important;
+  }
+
+  .queue-board {
+    display: block !important;
+    border: 1px solid #bbb !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  .queue-now,
+  .queue-next,
+  .queue-waiting {
+    min-height: 0 !important;
+    padding: 4mm !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  .queue-now,
+  .queue-next {
+    border-bottom: 1px solid #bbb !important;
+  }
+
+  .queue-token-display,
+  .queue-next-token,
+  .queue-waiting-number {
+    margin: 2mm 0 !important;
+    color: #111 !important;
+    font-size: 24pt !important;
+  }
+
+  .queue-board-label,
+  .queue-patient,
+  .queue-patient-sub,
+  .queue-next-name,
+  .queue-next-sub,
+  .queue-waiting-label,
+  .queue-waiting-split span {
+    color: #333 !important;
+  }
+
+  .queue-item {
+    border: 1px solid #ccc !important;
+    background: #fff !important;
+    break-inside: avoid;
+  }
+
+  .queue-item-token,
+  .queue-item.is-serving .queue-item-token {
+    background: #eee !important;
+    color: #111 !important;
+  }
+
+  .empty-state {
+    padding: 8mm 4mm !important;
+  }
+
+  .empty-icon {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+}

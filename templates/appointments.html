@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, status_badge, empty_state %}
+{% block title %}Appointments{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head-main">
+    <p class="eyebrow">Appointments</p>
+    <h1 class="page-title">Appointment schedule</h1>
+    <p class="page-sub">Book visits, check patients in, and keep every consultation moving from one place.</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn--secondary" href="{{ url_for('appointment_ledger') }}">{{ icon("list") }}<span>Appointment ledger</span></a>
+    <a class="btn btn--secondary" href="{{ url_for('queue_select') }}">{{ icon("queue") }}<span>Queue board</span></a>
+    <a class="btn btn--secondary" href="{{ url_for('reports', date=day.isoformat()) }}">{{ icon("chart") }}<span>Day report</span></a>
+  </div>
+</div>
+
+<div class="split-layout">
+  <section class="panel" aria-labelledby="schedule-title">
+    <div class="panel-head">
+      <div class="panel-head-main">
+        <h2 class="panel-title" id="schedule-title">{{ icon("calendar") }} {{ day.strftime('%A, %d %B %Y') }}</h2>
+        <p class="panel-sub">{{ rows|length }} appointment{{ '' if rows|length == 1 else 's' }} on this day.</p>
+      </div>
+      <div class="date-nav" aria-label="Change schedule date">
+        <a class="icon-btn" href="{{ url_for('appointments', date=prev_day) }}" aria-label="Previous day">{{ icon("chevron-left") }}</a>
+        <span class="date-nav-label">{{ day.strftime('%a %d %b') }}</span>
+        <a class="icon-btn" href="{{ url_for('appointments', date=next_day) }}" aria-label="Next day">{{ icon("chevron-right") }}</a>
+      </div>
+    </div>
+
+    <div class="schedule-toolbar">
+      <form class="date-picker" method="get" action="{{ url_for('appointments') }}">
+        <label class="sr-only" for="schedule-date">Schedule date</label>
+        <input class="input" id="schedule-date" type="date" name="date" value="{{ day.isoformat() }}">
+        <button class="btn btn--secondary btn--sm" type="submit">Show date</button>
+      </form>
+      <p class="toolbar-meta">Tokens are unique per doctor, per day.</p>
+    </div>
+
+    {% if rows %}
+    <div class="table-tools">
+      <label class="search" for="appointment-search">
+        <span class="sr-only">Search appointments</span>
+        {{ icon("search") }}
+        <input id="appointment-search" type="search" placeholder="Search patient, doctor, or reason" autocomplete="off" data-table-filter="#appointment-table">
+      </label>
+      <select class="select" aria-label="Filter appointments by status" data-table-status="#appointment-table">
+        <option value="">All statuses</option>
+        {% for status in STATUSES %}
+        <option value="{{ status }}">{{ STATUS_LABEL[status] }}</option>
+        {% endfor %}
+      </select>
+      <span class="table-count" data-table-count="#appointment-table">{{ rows|length }} shown</span>
+    </div>
+
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Appointments for {{ day.strftime('%d %B %Y') }}">
+      <table class="data-table" id="appointment-table">
+        <caption class="sr-only">Appointments for {{ day.strftime('%d %B %Y') }}</caption>
+        <thead>
+          <tr>
+            <th scope="col">Time</th>
+            <th scope="col">Patient</th>
+            <th scope="col">Doctor</th>
+            <th scope="col">Status</th>
+            <th scope="col" class="actions-col"><span class="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in rows %}
+          {% set next_step = {'BOOKED': ('WAITING', 'Check in'), 'WAITING': ('IN_PROGRESS', 'Start'), 'IN_PROGRESS': ('COMPLETED', 'Complete')}.get(a.status) %}
+          <tr data-status="{{ a.status }}" data-search="{{ (a.patient_name ~ ' ' ~ a.doctor_name ~ ' ' ~ (a.reason or '') ~ ' ' ~ (a.token_no or ''))|lower }}">
+            <td>
+              <span class="cell-main nowrap">{{ a.appointment_datetime|hm }}</span>
+              <span class="cell-sub">Token {{ a.token_no if a.token_no else '—' }}</span>
+            </td>
+            <td>
+              <div class="patient-cell">
+                <span class="avatar avatar--sm" aria-hidden="true">{{ a.patient_name|initials }}</span>
+                <div class="patient-cell-text">
+                  <strong>{{ a.patient_name }}</strong>
+                  <span>{{ a.reason or a.phone }}</span>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span class="cell-main">{{ a.doctor_name }}</span>
+              <span class="cell-sub">{{ a.specialization }}</span>
+            </td>
+            <td>{{ status_badge(a.status) }}</td>
+            <td class="actions-col">
+              <div class="row-actions">
+                {% if can_manage and next_step %}
+                <form method="post" action="{{ url_for('update_status', appointment_id=a.appointment_id) }}">
+                  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+                  <input type="hidden" name="status" value="{{ next_step[0] }}">
+                  <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
+                  <button class="btn btn--primary btn--sm" type="submit">{{ next_step[1] }}</button>
+                </form>
+                {% endif %}
+                {% if can_manage and a.status in ('BOOKED', 'WAITING', 'IN_PROGRESS') %}
+                <form method="post" action="{{ url_for('update_status', appointment_id=a.appointment_id) }}"
+                      data-confirm="Cancel token {{ a.token_no }} for {{ a.patient_name }}?"
+                      data-confirm-title="Cancel appointment">
+                  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+                  <input type="hidden" name="status" value="CANCELLED">
+                  <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
+                  <button class="btn btn--ghost btn--sm" type="submit">Cancel</button>
+                </form>
+                {% endif %}
+                <a class="icon-btn icon-btn--sm" href="{{ url_for('patient_edit', patient_id=a.patient_id) }}" aria-label="Open {{ a.patient_name }}'s record" title="Patient record">{{ icon("arrow-up-right") }}</a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    {{ empty_state("calendar", "No appointments on this day", "Choose another date above, or book the first appointment for " ~ day.strftime('%d %b %Y') ~ ".", url_for('appointments', date=day.isoformat()) ~ '#book' if can_manage else None, "Book an appointment" if can_manage else None) }}
+    {% endif %}
+  </section>
+
+  <section class="panel booking-panel" id="book" aria-labelledby="book-title">
+    <div class="panel-head">
+      <div class="panel-head-main">
+        <h2 class="panel-title" id="book-title">{{ icon("calendar-plus") }} Book an appointment</h2>
+        <p class="panel-sub">The doctor's schedule is checked for clashes before saving.</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      {% if not patients or not doctors %}
+      <div class="notice notice--warning">
+        {{ icon("alert") }}
+        <span>Add at least one <a href="{{ url_for('patients') }}">patient</a> and one <a href="{{ url_for('doctors') }}">doctor</a> before booking an appointment.</span>
+      </div>
+      {% else %}
+      {% set selected_patient = form_data.get('patient_id') or preselect_patient %}
+      {% set selected_doctor = form_data.get('doctor_id') or preselect_doctor %}
+      <form class="form" method="post" action="{{ url_for('appointments', date=day.isoformat()) }}">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+
+        <label class="field">
+          <span class="field-label">Patient <span class="required" aria-hidden="true">*</span></span>
+          <select class="select" name="patient_id" required>
+            <option value="">Choose a patient</option>
+            {% for p in patients %}
+            <option value="{{ p.patient_id }}" {% if p.patient_id|string == selected_patient|string %}selected{% endif %}>{{ p.full_name }} · {{ p.phone }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="field-label">Doctor <span class="required" aria-hidden="true">*</span></span>
+          <select class="select" name="doctor_id" required>
+            <option value="">Choose a doctor</option>
+            {% for d in doctors %}
+            <option value="{{ d.doctor_id }}" {% if d.doctor_id|string == selected_doctor|string %}selected{% endif %}>{{ d.full_name }} · {{ d.specialization }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="field-label">Date and time <span class="required" aria-hidden="true">*</span></span>
+          <input class="input" type="datetime-local" name="appointment_datetime"
+                 value="{{ form_data.get('appointment_datetime') or (day.isoformat() ~ 'T10:00') }}"
+                 min="{{ min_datetime }}" required>
+        </label>
+
+        <label class="field">
+          <span class="field-label">Reason for visit <span class="optional">Optional</span></span>
+          <input class="input" name="reason" maxlength="250" value="{{ form_data.get('reason', '') }}" placeholder="Follow-up, new complaint, review…">
+        </label>
+
+        <details class="advanced">
+          <summary>Manual token override</summary>
+          <label class="field">
+            <span class="field-label">Token number <span class="optional">Optional</span></span>
+            <input class="input" name="token_no" type="number" min="1" inputmode="numeric" placeholder="Next available token" value="{{ form_data.get('token_no', '') }}">
+            <span class="field-help">Leave empty to assign the next token for this doctor and day.</span>
+          </label>
+        </details>
+
+        <div class="form-actions">
+          <button class="btn btn--primary" type="submit">{{ icon("calendar-plus") }} Book appointment</button>
+          <a class="btn btn--ghost" href="{{ url_for('appointments', date=day.isoformat()) }}">Clear</a>
+        </div>
+      </form>
+      {% endif %}
+    </div>
+    <div class="panel-foot">
+      <span class="booking-token-note">{{ icon("info") }} Appointments start as scheduled and move through check-in, consultation, and completion.</span>
+    </div>
+  </section>
+</div>
+{% endblock %}

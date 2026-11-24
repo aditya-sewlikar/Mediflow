@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, empty_state %}
+{% block title %}Doctors{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-head-main">
+    <p class="eyebrow">Doctors</p>
+    <h1 class="page-title">Care team</h1>
+    <p class="page-sub">The clinicians behind today's queues, with their load and live consult state at a glance.</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn--secondary" href="{{ url_for('queue_select') }}">{{ icon("queue") }}<span>Queue board</span></a>
+    {% if can_manage %}
+    <button class="btn btn--primary" type="button" data-dialog-open="#doctor-dialog">{{ icon("plus") }}<span>Add doctor</span></button>
+    {% endif %}
+  </div>
+</div>
+
+{% if doctor_cards %}
+<div class="doctor-grid">
+  {% for d in doctor_cards %}
+  <article class="doctor-card">
+    <div class="doctor-card-top">
+      <div class="queue-doctor">
+        <span class="avatar avatar--lg avatar--doctor" aria-hidden="true">{{ d.full_name|initials }}</span>
+        <div class="identity-text">
+          <span class="identity-name">{{ d.full_name }}</span>
+          <span class="doctor-specialty">{{ d.specialization }}</span>
+        </div>
+      </div>
+      <span class="status-pill status-pill--{{ d.state }}">{{ d.state_label }}</span>
+    </div>
+
+    {% if d.phone %}
+    <p class="doctor-contact">{{ icon("phone") }} {{ d.phone }}</p>
+    {% endif %}
+
+    <div class="doctor-stats" aria-label="Queue and patient statistics for {{ d.full_name }}">
+      <div class="doctor-stat">
+        <span>Waiting</span>
+        <b>{{ d.waiting }}</b>
+      </div>
+      <div class="doctor-stat">
+        <span>Booked</span>
+        <b>{{ d.booked }}</b>
+      </div>
+      <div class="doctor-stat">
+        <span>Completed</span>
+        <b>{{ d.completed }}</b>
+      </div>
+      <div class="doctor-stat">
+        <span>Patients</span>
+        <b>{{ d.patient_count }}</b>
+      </div>
+    </div>
+
+    <div class="doctor-now">
+      <span>{% if d.serving_patient %}Now serving{% else %}Next patient{% endif %}</span>
+      <strong>{{ d.serving_patient or d.next_patient or 'No one waiting' }}</strong>
+      <span class="token-pill">{% if d.serving_token %}Token <b>{{ d.serving_token }}</b>{% elif d.next_token %}Token <b>{{ d.next_token }}</b>{% else %}—{% endif %}</span>
+    </div>
+
+    {% if can_set_availability %}
+    <form class="availability-form" method="post" action="{{ url_for('doctor_availability', doctor_id=d.doctor_id) }}">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
+      <label class="sr-only" for="availability-{{ d.doctor_id }}">Availability for {{ d.full_name }}</label>
+      <select class="select select--sm" id="availability-{{ d.doctor_id }}" name="availability">
+        {% for option in AVAILABILITY %}
+        <option value="{{ option }}" {{ 'selected' if d.availability == option }}>{{ AVAILABILITY_LABEL[option] }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn--secondary btn--sm" type="submit">Set status</button>
+    </form>
+    {% endif %}
+
+    <div class="doctor-card-foot">
+      <span class="muted text-xs">{{ icon("clock") }} {{ (d.avg_wait ~ ' min avg wait') if d.avg_wait is not none else 'No wait recorded' }}</span>
+      <a class="queue-link" href="{{ url_for('queue_view', doctor_id=d.doctor_id) }}">Open queue {{ icon("arrow-right") }}</a>
+    </div>
+
+    {% if can_manage %}
+    <a class="btn btn--secondary btn--sm btn--block" href="{{ url_for('appointments', doctor_id=d.doctor_id) }}#book">{{ icon("calendar-plus") }} Book with {{ d.full_name.split(' ')[-1] }}</a>
+    {% endif %}
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<div class="panel">
+  {{ empty_state("doctor", "No doctors on the roster", "Add the first clinician so the clinic can open a queue and take appointments.", None, None) }}
+  {% if can_manage %}
+  <div class="empty-state empty-state--tight">
+    <button class="btn btn--primary" type="button" data-dialog-open="#doctor-dialog">{{ icon("plus") }} Add first doctor</button>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if can_manage %}
+<dialog class="dialog" id="doctor-dialog" data-auto-open="{{ 'true' if open_form or request.args.get('open') == '1' else 'false' }}" aria-labelledby="doctor-dialog-title">
+  <form method="post" action="{{ url_for('doctors') }}">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+    <div class="dialog-head">
+      <div>
+        <h2 class="dialog-title" id="doctor-dialog-title">Add a doctor</h2>
+        <p class="dialog-sub">Create the clinician record that appointments and queues will use.</p>
+      </div>
+      <button class="icon-btn dialog-close" type="button" data-dialog-close aria-label="Close">{{ icon("x") }}</button>
+    </div>
+    <div class="dialog-body">
+      <div class="form">
+        <label class="field">
+          <span class="field-label">Full name <span class="required" aria-hidden="true">*</span></span>
+          <input class="input" name="full_name" maxlength="100" value="{{ form_data.get('full_name', '') }}" autocomplete="name" required>
+        </label>
+        <div class="field-grid">
+          <label class="field">
+            <span class="field-label">Specialization <span class="required" aria-hidden="true">*</span></span>
+            <input class="input" name="specialization" maxlength="80" value="{{ form_data.get('specialization', '') }}" placeholder="General Physician" required>
+          </label>
+          <label class="field">
+            <span class="field-label">Phone <span class="optional">Optional</span></span>
+            <input class="input" name="phone" inputmode="numeric" pattern="[0-9]{7,15}" maxlength="15" value="{{ form_data.get('phone', '') }}" autocomplete="tel">
+          </label>
+        </div>
+      </div>
+    </div>
+    <div class="dialog-foot">
+      <button class="btn btn--secondary" type="button" data-dialog-close>Cancel</button>
+      <button class="btn btn--primary" type="submit">{{ icon("plus") }} Add doctor</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+{% endblock %}

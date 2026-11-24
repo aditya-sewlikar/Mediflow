@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, status_badge, empty_state %}
+{% block title %}Live queue · {{ doc.full_name }}{% endblock %}
+{% block content %}
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <a href="{{ url_for('queue_select') }}">Queue board</a>
+  {{ icon("chevron-right") }}
+  <span aria-current="page">{{ doc.full_name }}</span>
+</nav>
+
+<div class="page-head">
+  <div class="page-head-main">
+    <div class="profile-head">
+      <span class="avatar avatar--doctor" aria-hidden="true">{{ doc.full_name|initials }}</span>
+      <div>
+        <p class="eyebrow">Live consultation queue</p>
+        <h1 class="profile-title">{{ doc.full_name }}</h1>
+        <div class="profile-meta">
+          <span>{{ icon("doctor") }} {{ doc.specialization }}</span>
+          {% if doc.phone %}<span>{{ icon("phone") }} {{ doc.phone }}</span>{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="page-actions">
+    <div class="segmented" aria-label="Queue scope">
+      <a class="{{ 'is-active' if scope == 'all' }}" href="{{ url_for('queue_view', doctor_id=doc.doctor_id, scope='all') }}">All appointments</a>
+      <a class="{{ 'is-active' if scope == 'day' }}" href="{{ url_for('queue_view', doctor_id=doc.doctor_id, date=day.isoformat(), scope='day') }}">Selected day</a>
+    </div>
+    {% if can_set_availability %}
+    <form class="availability-form availability-form--inline no-print" method="post" action="{{ url_for('doctor_availability', doctor_id=doc.doctor_id) }}">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
+      <label class="sr-only" for="queue-availability">Availability for {{ doc.full_name }}</label>
+      <select class="select select--sm" id="queue-availability" name="availability">
+        {% for option in AVAILABILITY %}
+        <option value="{{ option }}" {{ 'selected' if doc.availability == option }}>{{ AVAILABILITY_LABEL[option] }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn--secondary btn--sm" type="submit">Set status</button>
+    </form>
+    {% endif %}
+    <div class="date-nav" aria-label="Change queue date">
+      <a class="icon-btn" href="{{ url_for('queue_view', doctor_id=doc.doctor_id, date=prev_day, scope='day') }}" aria-label="Previous day">{{ icon("chevron-left") }}</a>
+      <span class="date-nav-label">{{ day.strftime('%a %d %b') }}</span>
+      <a class="icon-btn" href="{{ url_for('queue_view', doctor_id=doc.doctor_id, date=next_day, scope='day') }}" aria-label="Next day">{{ icon("chevron-right") }}</a>
+    </div>
+  </div>
+</div>
+
+<div class="queue-page" data-queue-page>
+  <div class="queue-toolbar no-print">
+    <div class="queue-live-state" data-live-state>
+      <span class="live-dot" aria-hidden="true"></span>
+      <span>Live board · <span data-updated>Updated just now</span></span>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn--secondary btn--sm" type="button" data-queue-pause aria-pressed="false">
+        {{ icon("pause") }}<span>Pause</span>
+      </button>
+      <button class="btn btn--secondary btn--sm" type="button" data-queue-refresh>
+        {{ icon("refresh") }}<span>Refresh</span>
+      </button>
+      <button class="btn btn--secondary btn--sm" type="button" data-fullscreen aria-pressed="false">
+        {{ icon("maximize") }}<span>Full screen</span>
+      </button>
+      <button class="btn btn--secondary btn--sm" type="button" data-print>
+        {{ icon("printer") }}<span>Print</span>
+      </button>
+    </div>
+  </div>
+
+  <p class="sr-only" data-live-announce aria-live="polite"></p>
+
+  <div class="queue-live-content" data-live-region>
+    <section class="queue-board" aria-label="Current queue state">
+      <div class="queue-now">
+        <span class="queue-board-label">Now seeing</span>
+        <div class="queue-token-display {{ 'is-empty' if not serving }}">{{ serving.token_no if serving else '—' }}</div>
+        <div class="queue-patient">{{ serving.patient_name if serving else 'No consultation in progress' }}</div>
+        <div class="queue-patient-sub">
+          {% if serving %}
+          Token {{ serving.token_no }} · booked for {{ serving.appointment_datetime|hm }}{% if serving.reason %} · {{ serving.reason }}{% endif %}
+          {% else %}
+          Start a checked-in patient when the doctor is ready.
+          {% endif %}
+        </div>
+        {% if can_manage and serving %}
+        <form method="post" action="{{ url_for('update_status', appointment_id=serving.appointment_id) }}">
+          <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+          <input type="hidden" name="status" value="COMPLETED">
+          <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
+          <button class="btn btn--secondary btn--sm" type="submit">{{ icon("check") }} Complete visit</button>
+        </form>
+        {% endif %}
+      </div>
+
+      <div class="queue-next">
+        <span class="queue-board-label">Next in line</span>
+        <div class="queue-next-token {{ 'is-empty' if not next_up }}">{{ next_up.token_no if next_up else '—' }}</div>
+        <div class="queue-next-name">{{ next_up.patient_name if next_up else 'Nobody has checked in' }}</div>
+        <div class="queue-next-sub">
+          {% if next_up %}
+          Booked for {{ next_up.appointment_datetime|hm }}{% if next_up.reason %} · {{ next_up.reason }}{% endif %}
+          {% else %}
+          Check in a booked patient to build the line.
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="queue-waiting">
+        <div class="queue-waiting-number">{{ waiting }}</div>
+        <div class="queue-waiting-label">checked in and waiting</div>
+        <div class="queue-waiting-split">
+          <div>
+            <span>Booked</span>
+            <strong>{{ booked }}</strong>
+          </div>
+          <div>
+            <span>Completed</span>
+            <strong>{{ completed }}</strong>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="queue-section" aria-labelledby="queue-list-title">
+      <div class="queue-section-head">
+        <h2 id="queue-list-title">{{ 'All appointments · newest first' if scope == 'all' else 'Queue in token order' }} <span class="badge badge--neutral">{{ active|length }} active</span></h2>
+        {% if can_manage %}
+        <a class="btn btn--secondary btn--sm" href="{{ url_for('appointments', date=day.isoformat(), doctor_id=doc.doctor_id) }}#book">{{ icon("plus") }} Book patient</a>
+        {% endif %}
+      </div>
+
+      {% if active %}
+      <div class="queue-list">
+        {% for a in active %}
+        {% set next_step = {'BOOKED': ('WAITING', 'Check in'), 'WAITING': ('IN_PROGRESS', 'Start'), 'IN_PROGRESS': ('COMPLETED', 'Complete')}.get(a.status) %}
+        <article class="queue-item {{ 'is-serving' if a.status == 'IN_PROGRESS' }}">
+          <div class="queue-item-token">{{ a.token_no }}</div>
+          <div class="queue-item-main">
+            <strong>{{ a.patient_name }}</strong>
+            <span>{{ a.phone }}{% if a.reason %} · {{ a.reason }}{% endif %}</span>
+          </div>
+          <div class="queue-item-meta">
+            {% if scope == 'all' %}<span><strong>{{ a.appointment_datetime|dt }}</strong></span>{% endif %}
+            <span><strong>{{ a.appointment_datetime|hm }}</strong> booked</span>
+            {{ status_badge(a.status) }}
+          </div>
+          <div class="queue-item-actions">
+            {% if can_manage and next_step %}
+            <form method="post" action="{{ url_for('update_status', appointment_id=a.appointment_id) }}">
+              <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+              <input type="hidden" name="status" value="{{ next_step[0] }}">
+              <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
+              <button class="btn btn--primary btn--sm" type="submit">{{ next_step[1] }}</button>
+            </form>
+            {% endif %}
+            {% if can_manage %}
+            <form method="post" action="{{ url_for('update_status', appointment_id=a.appointment_id) }}"
+                  data-confirm="Cancel token {{ a.token_no }} for {{ a.patient_name }}?"
+                  data-confirm-title="Cancel appointment">
+              <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+              <input type="hidden" name="status" value="CANCELLED">
+              <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
+              <button class="btn btn--ghost btn--sm" type="submit">Cancel</button>
+            </form>
+            {% endif %}
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="panel">
+        {{ empty_state("queue", "No appointments to show", ("No active appointments for this doctor on " ~ day.strftime('%d %b %Y') ~ ".") if scope == 'day' else "This doctor has no appointments booked yet.", url_for('appointments', date=day.isoformat(), doctor_id=doc.doctor_id) ~ '#book' if can_manage else None, "Book an appointment" if can_manage else None) }}
+      </div>
+      {% endif %}
+    </section>
+
+    {% if closed %}
+    <details class="closed-list no-print">
+      <summary>Finished or cancelled ({{ closed|length }})</summary>
+      <div class="table-wrap" tabindex="0" role="region" aria-label="Finished or cancelled appointments">
+        <table class="data-table">
+          <caption class="sr-only">Finished or cancelled appointments {{ 'across all dates' if scope == 'all' else 'for ' ~ day.strftime('%d %B %Y') }}</caption>
+          <thead>
+            <tr>
+              <th scope="col">Token</th>
+              <th scope="col">Patient</th>
+              {% if scope == 'all' %}<th scope="col">Date</th>{% endif %}
+              <th scope="col">Time</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in closed %}
+            <tr>
+              <td><span class="mono">{{ a.token_no }}</span></td>
+              <td>{{ a.patient_name }}</td>
+              {% if scope == 'all' %}<td>{{ a.appointment_datetime.strftime('%d %b %Y') }}</td>{% endif %}
+              <td>{{ a.appointment_datetime|hm }}</td>
+              <td>{{ status_badge(a.status) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

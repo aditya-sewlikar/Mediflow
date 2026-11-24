@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Error {{ code }}{% endblock %}
+
+{% macro error_card() %}
+<div class="error-page">
+  <div class="error-card">
+    <span class="error-icon" aria-hidden="true">{{ icon("alert") }}</span>
+    <p class="error-code">Error {{ code }}</p>
+    <h1 class="error-title">
+      {% if code == 400 %}That request could not be completed
+      {% elif code == 403 %}Access is restricted
+      {% elif code == 404 %}We could not find that page
+      {% else %}Something went wrong{% endif %}
+    </h1>
+    <p class="error-message">{{ message }}</p>
+    <div class="error-actions">
+      <a class="btn btn--primary" href="{{ url_for('index') }}">Back to today</a>
+      <a class="btn btn--secondary" href="{{ url_for('queue_select') }}">Open queue board</a>
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+{% block content %}{{ error_card() }}{% endblock %}
+
+{% block auth_content %}
+<div class="auth-shell">
+  <div class="auth-layout auth-layout--single">
+    <main class="auth-panel" id="main" tabindex="-1">
+      {{ error_card() }}
+    </main>
+  </div>
+</div>
+{% endblock %}
