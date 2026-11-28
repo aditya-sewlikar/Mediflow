@@ -1,0 +1,61 @@
+%% MediFlow entity relationship diagram (Mermaid)
+%% Render with: https://mermaid.live  or  npx @mermaid-js/mermaid-cli -i er-diagram.mmd -o er-diagram.png
+
+erDiagram
+    CLINICS ||--o{ PATIENTS : "one tenant, many patients"
+    CLINICS ||--o{ DOCTORS : "one tenant, many doctors"
+    CLINICS ||--o{ APPOINTMENTS : "one tenant, many appointments"
+    CLINICS |o--o{ USERS : "accounts (platform admins have no clinic)"
+    PATIENTS ||--o{ APPOINTMENTS : "booked for patient; composite FK also carries clinic_id"
+    DOCTORS ||--o{ APPOINTMENTS : "handled by doctor; composite FK also carries clinic_id"
+
+    CLINICS {
+        NUMBER clinic_id PK "identity"
+        VARCHAR2_150 clinic_name "NOT NULL"
+        VARCHAR2_80 slug "UK, NOT NULL"
+        VARCHAR2_100 email "nullable"
+        VARCHAR2_20 status "ACTIVE | SUSPENDED"
+        NUMBER_1 is_default "0 | 1, only one default row"
+        TIMESTAMP created_at "NOT NULL"
+    }
+
+    PATIENTS {
+        NUMBER patient_id PK "identity; part of tenant composite key"
+        NUMBER clinic_id FK "NOT NULL; -> clinics"
+        VARCHAR2_100 full_name "NOT NULL"
+        VARCHAR2_15 phone "NOT NULL; unique per clinic"
+        VARCHAR2_100 email "nullable"
+        VARCHAR2_10 gender "nullable"
+        DATE date_of_birth "nullable"
+        TIMESTAMP created_at "nullable, defaults to now"
+    }
+
+    DOCTORS {
+        NUMBER doctor_id PK "identity; part of tenant composite key"
+        NUMBER clinic_id FK "NOT NULL; -> clinics"
+        VARCHAR2_100 full_name "NOT NULL"
+        VARCHAR2_80 specialization "NOT NULL"
+        VARCHAR2_15 phone "nullable; unique per clinic when present"
+        VARCHAR2_20 availability "AVAILABLE | BUSY | OFFLINE"
+    }
+
+    APPOINTMENTS {
+        NUMBER appointment_id PK "identity"
+        NUMBER clinic_id FK "NOT NULL; -> clinics"
+        NUMBER patient_id FK "NOT NULL; -> patients (+ composite tenant FK)"
+        NUMBER doctor_id FK "NOT NULL; -> doctors (+ composite tenant FK)"
+        TIMESTAMP appointment_datetime "NOT NULL"
+        NUMBER token_no "nullable; unique per doctor + time"
+        VARCHAR2_20 status "BOOKED | WAITING | IN_PROGRESS | COMPLETED | CANCELLED"
+        VARCHAR2_250 reason "nullable"
+    }
+
+    USERS {
+        NUMBER user_id PK "identity"
+        NUMBER clinic_id FK "NULL for ADMIN / PLATFORM_ADMIN only"
+        VARCHAR2_100 full_name "NOT NULL"
+        VARCHAR2_50 username "UK, NOT NULL; case-insensitive UK too"
+        VARCHAR2_100 email "UK, case-insensitive; nullable"
+        VARCHAR2_255 password_hash "NOT NULL"
+        VARCHAR2_20 role "ADMIN | PLATFORM_ADMIN | CLINIC_ADMIN | RECEPTIONIST | DOCTOR"
+    }

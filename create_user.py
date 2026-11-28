@@ -9,10 +9,9 @@ Existing accounts are never modified.
 import getpass
 import re
 
-import oracledb
 from werkzeug.security import generate_password_hash
 
-from db import execute, query_one
+from db import IntegrityError, execute, query_one
 
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{3,50}$")
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
@@ -73,7 +72,7 @@ try:
             "r": role,
         },
     )
-except oracledb.IntegrityError:
+except IntegrityError:
     raise SystemExit("Error: that username or email is already registered.")
 
 scope = "all clinics (platform administrator)" if clinic_id is None else f"clinic_id={clinic_id}"

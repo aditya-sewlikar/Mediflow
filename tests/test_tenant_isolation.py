@@ -1,4 +1,4 @@
-"""End-to-end tenant isolation tests against the configured Oracle schema.
+"""End-to-end tenant isolation tests against the configured Oracle or MySQL schema.
 
 Run with:  python -m unittest tests.test_tenant_isolation -v
 
@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash
 
 from app import app, slugify
+from config import config
 from db import execute, query, query_one
 
 
@@ -147,17 +148,36 @@ class TenantIsolationTests(unittest.TestCase):
 
     def test_00_every_tenant_table_has_a_clinic_foreign_key(self):
         """A converted legacy schema must have the same ownership FKs as a fresh one."""
-        rows = query(
-            """SELECT c.table_name, cc.column_name
-                 FROM user_constraints c
-                 JOIN user_cons_columns cc ON cc.constraint_name = c.constraint_name
-                 JOIN user_constraints parent
-                   ON parent.constraint_name = c.r_constraint_name
-                WHERE c.constraint_type = 'R'
-                  AND parent.table_name = 'CLINICS'
-                  AND c.table_name IN ('PATIENTS', 'DOCTORS', 'APPOINTMENTS', 'USERS')"""
-        )
-        owned = {(row["table_name"], row["column_name"]) for row in rows}
+        if config.is_mysql:
+            rows = query(
+                """SELECT kcu.TABLE_NAME AS table_name, kcu.COLUMN_NAME AS column_name
+                     FROM information_schema.KEY_COLUMN_USAGE kcu
+                     JOIN information_schema.TABLE_CONSTRAINTS tc
+                       ON tc.CONSTRAINT_SCHEMA = kcu.CONSTRAINT_SCHEMA
+                      AND tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+                      AND tc.TABLE_NAME = kcu.TABLE_NAME
+                    WHERE tc.CONSTRAINT_TYPE = 'FOREIGN KEY'
+                      AND kcu.REFERENCED_TABLE_NAME = 'clinics'
+                      AND kcu.TABLE_NAME IN
+                          ('patients','doctors','appointments','users')"""
+            )
+            owned = {
+                (row["table_name"].upper(), row["column_name"].upper())
+                for row in rows
+            }
+        else:
+            rows = query(
+                """SELECT c.table_name, cc.column_name
+                     FROM user_constraints c
+                     JOIN user_cons_columns cc ON cc.constraint_name = c.constraint_name
+                     JOIN user_constraints parent
+                       ON parent.constraint_name = c.r_constraint_name
+                    WHERE c.constraint_type = 'R'
+                      AND parent.table_name = 'CLINICS'
+                      AND c.table_name IN
+                          ('PATIENTS', 'DOCTORS', 'APPOINTMENTS', 'USERS')"""
+            )
+            owned = {(row["table_name"], row["column_name"]) for row in rows}
         for table in ("PATIENTS", "DOCTORS", "APPOINTMENTS", "USERS"):
             self.assertIn((table, "CLINIC_ID"), owned)
 
@@ -235,9 +255,10 @@ class TenantIsolationTests(unittest.TestCase):
         self.assertIn(self.doctors["B"][0], doctor_ids)
 
     def test_07_stats_search_filters_reports_and_exports_are_scoped(self):
-        today = (datetime.now() + timedelta(hours=2)).replace(
-            second=0, microsecond=0
-        ).strftime("%Y-%m-%dT%H:%M")
+        # Keep this on today's date; +2 hours crosses midnight in the evening.
+        today = datetime.now().replace(second=0, microsecond=0).strftime(
+            "%Y-%m-%dT%H:%M"
+        )
         appointment_id = self.book(
             "A", self.patients["A"][1][0], self.doctors["A"][0], today
         )
@@ -317,6 +338,84 @@ class TenantIsolationTests(unittest.TestCase):
         self.assertEqual(302, response.status_code)
         body = self.clients["ADMIN"].get("/admin/clinics").get_data(as_text=True)
         self.assertIn("All clinics · platform admin", body)
+
+    def test_09_platform_admin_global_view_can_add_records(self):
+        """The global view shows add buttons, so its forms must actually work."""
+        body = self.clients["ADMIN"].get("/patients").get_data(as_text=True)
+        self.assertIn('name="clinic_id"', body)
+
+        patient_name = f"Platform Added Patient {self.suffix}"
+        phone = self.unique_phone()
+        response = self.post("ADMIN", "/patients", {
+            "full_name": patient_name, "phone": phone,
+            "clinic_id": str(self.clinic_ids["B"]),
+        })
+        self.assertEqual(302, response.status_code, response.get_data(as_text=True)[:800])
+        row = query_one("SELECT clinic_id FROM patients WHERE phone = :p", {"p": phone})
+        self.assertEqual(self.clinic_ids["B"], int(row["clinic_id"]))
+
+        doctor_name = f"Platform Added Doctor {self.suffix}"
+        response = self.post("ADMIN", "/doctors", {
+            "full_name": doctor_name, "specialization": "General Physician",
+            "clinic_id": str(self.clinic_ids["B"]),
+        })
+        self.assertEqual(302, response.status_code, response.get_data(as_text=True)[:800])
+        row = query_one(
+            "SELECT clinic_id FROM doctors WHERE full_name = :n", {"n": doctor_name}
+        )
+        self.assertEqual(self.clinic_ids["B"], int(row["clinic_id"]))
+
+        # Phone is optional: two doctors without one in the same clinic must
+        # both be accepted (the old unique index rejected the second one).
+        second_name = f"Second Platform Doctor {self.suffix}"
+        response = self.post("ADMIN", "/doctors", {
+            "full_name": second_name, "specialization": "General Physician",
+            "clinic_id": str(self.clinic_ids["B"]),
+        })
+        self.assertEqual(302, response.status_code, response.get_data(as_text=True)[:800])
+        row = query_one("SELECT phone FROM doctors WHERE full_name = :n", {"n": second_name})
+        self.assertIsNone(row["phone"])
+
+        # An unselected or forged clinic must never create an orphan record.
+        response = self.post("ADMIN", "/patients", {
+            "full_name": f"No Clinic Patient {self.suffix}",
+            "phone": self.unique_phone(), "clinic_id": "999999999",
+        })
+        self.assertEqual(200, response.status_code)
+        self.assertIn("Choose the clinic", response.get_data(as_text=True))
+
+    def test_10_patient_cannot_have_two_active_appointments(self):
+        """A patient must finish or cancel a visit before booking another one."""
+        patient_id, _ = self.patients["A"][2]
+        doctor_id, _ = self.doctors["A"]
+        first = (datetime.now() + timedelta(days=5)).replace(
+            second=0, microsecond=0
+        ).strftime("%Y-%m-%dT%H:%M")
+        second = (datetime.now() + timedelta(days=6)).replace(
+            second=0, microsecond=0
+        ).strftime("%Y-%m-%dT%H:%M")
+
+        appointment_id = self.book("A", patient_id, doctor_id, first)
+        response = self.post("A", "/appointments", {
+            "patient_id": str(patient_id), "doctor_id": str(doctor_id),
+            "appointment_datetime": second, "token_no": "",
+            "reason": "Should be rejected",
+        })
+        self.assertEqual(200, response.status_code)
+        self.assertIn("already has an active appointment", response.get_data(as_text=True))
+        count = query_one(
+            """SELECT COUNT(*) AS c FROM appointments
+                WHERE clinic_id = :c AND patient_id = :p""",
+            {"c": self.clinic_ids["A"], "p": patient_id},
+        )
+        self.assertEqual(1, int(count["c"]))
+
+        # Cancelling the open visit releases the patient for a new booking.
+        response = self.post(
+            "A", f"/appointments/{appointment_id}/status", {"status": "CANCELLED"}
+        )
+        self.assertEqual(302, response.status_code)
+        self.book("A", patient_id, doctor_id, second)
 
 
 if __name__ == "__main__":

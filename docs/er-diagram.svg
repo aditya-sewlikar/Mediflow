@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1620" height="1000" viewBox="0 0 1620 1000" role="img" aria-labelledby="title desc">
+  <title id="title">MediFlow entity relationship diagram</title>
+  <desc id="desc">Five Oracle tables: clinics, patients, doctors, appointments and users, with tenant-scoped foreign keys and composite foreign keys enforcing cross-tenant isolation.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#5b6b82"/>
+    </marker>
+    <marker id="arrow-dash" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#b05a2a"/>
+    </marker>
+    <style>
+      .bg { fill: #f6f8fc; }
+      .h1 { font: 700 24px 'Segoe UI', Arial, sans-serif; fill: #142b49; }
+      .h2 { font: 13px 'Segoe UI', Arial, sans-serif; fill: #5b6b82; }
+      .section { font: 700 13px 'Segoe UI', Arial, sans-serif; fill: #34495e; letter-spacing: .08em; }
+      .headtext { font: 700 14px 'Segoe UI', Arial, sans-serif; fill: #ffffff; letter-spacing: .04em; }
+      .key { font: 700 12.5px Consolas, 'Courier New', monospace; }
+      .attr { font: 12.5px Consolas, 'Courier New', monospace; fill: #23324a; }
+      .pk { fill: #0b5cab; }
+      .fk { fill: #8a4b08; }
+      .rel { fill: none; stroke: #5b6b82; stroke-width: 2; marker-end: url(#arrow); }
+      .rel-dash { fill: none; stroke: #b05a2a; stroke-width: 1.8; stroke-dasharray: 7 4; marker-end: url(#arrow-dash); }
+      .rellabel { font: 600 12px 'Segoe UI', Arial, sans-serif; fill: #34495e; }
+      .dashlabel { font: 600 11.5px 'Segoe UI', Arial, sans-serif; fill: #b05a2a; }
+      .note { fill: #eef3f9; stroke: #c8d5e5; stroke-width: 1.5; }
+      .notetext { font: 12.5px Consolas, 'Courier New', monospace; fill: #23324a; }
+      .legend { font: 12px 'Segoe UI', Arial, sans-serif; fill: #34495e; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1620" height="1000"/>
+  <text class="h1" x="60" y="48">MediFlow — Entity Relationship Diagram</text>
+  <text class="h2" x="60" y="72">Oracle schema: sql/01_schema.sql (fresh install) + migrations 05, 06, 08 · 5 tables · tenant key = clinics.clinic_id</text>
+
+  <!-- relationships (drawn behind the entity boxes) -->
+  <path class="rel" d="M 200,310 L 200,436"/>
+  <text class="rellabel" x="210" y="378">1 : 0..*</text>
+
+  <path class="rel" d="M 380,310 L 698,436"/>
+  <text class="rellabel" x="512" y="360">1 : 0..*</text>
+
+  <path class="rel" d="M 430,250 L 1288,436"/>
+  <text class="rellabel" x="850" y="316">1 : 0..*</text>
+
+  <path class="rel" d="M 430,160 L 1186,160"/>
+  <text class="rellabel" x="740" y="148">1 : 0..* (users.clinic_id is nullable)</text>
+
+  <path class="rel" d="M 430,550 L 556,550"/>
+  <text class="rellabel" x="440" y="538">1 : 0..*</text>
+
+  <path class="rel" d="M 1106,550 L 974,550"/>
+  <text class="rellabel" x="1000" y="538">1 : 0..*</text>
+
+  <!-- composite tenant foreign keys -->
+  <path class="rel-dash" d="M 600,662 L 424,662"/>
+  <text class="dashlabel" x="430" y="682">composite FK: (patient_id, clinic_id)</text>
+
+  <path class="rel-dash" d="M 930,662 L 1114,662"/>
+  <text class="dashlabel" x="934" y="682">composite FK: (doctor_id, clinic_id)</text>
+
+  <!-- legend -->
+  <rect x="1190" y="348" width="290" height="72" rx="8" fill="#ffffff" stroke="#c8d5e5"/>
+  <path class="rel" d="M 1208,370 L 1252,370"/>
+  <text class="legend" x="1262" y="374">foreign key relationship</text>
+  <path class="rel-dash" d="M 1208,397 L 1252,397"/>
+  <text class="legend" x="1262" y="401">composite tenant FK</text>
+
+  <!-- CLINICS -->
+  <g>
+    <rect x="60" y="110" width="370" height="200" rx="10" fill="#ffffff" stroke="#9fb3ca" stroke-width="1.5"/>
+    <path d="M 60,124 Q 60,110 74,110 L 416,110 Q 430,110 430,124 L 430,144 L 60,144 Z" fill="#1d5b8f"/>
+    <text class="headtext" x="76" y="133">CLINICS</text>
+    <text class="key pk" x="76" y="166">PK</text><text class="attr" x="120" y="166">clinic_id        NUMBER           identity</text>
+    <text class="attr" x="76" y="186">clinic_name    VARCHAR2(150)   NOT NULL</text>
+    <text class="attr" x="76" y="206">slug                 VARCHAR2(80)      UK</text>
+    <text class="attr" x="76" y="226">email                VARCHAR2(100)   NULL</text>
+    <text class="attr" x="76" y="246">status              VARCHAR2(20)     ACTIVE|SUSPENDED</text>
+    <text class="attr" x="76" y="266">is_default         NUMBER(1)          0|1</text>
+    <text class="attr" x="76" y="286">created_at        TIMESTAMP          NOT NULL</text>
+  </g>
+
+  <!-- USERS -->
+  <g>
+    <rect x="1190" y="110" width="370" height="200" rx="10" fill="#ffffff" stroke="#9fb3ca" stroke-width="1.5"/>
+    <path d="M 1190,124 Q 1190,110 1204,110 L 1546,110 Q 1560,110 1560,124 L 1560,144 L 1190,144 Z" fill="#4a5f8a"/>
+    <text class="headtext" x="1206" y="133">USERS</text>
+    <text class="key pk" x="1206" y="166">PK</text><text class="attr" x="1250" y="166">user_id          NUMBER          identity</text>
+    <text class="key fk" x="1206" y="186">FK</text><text class="attr" x="1250" y="186">clinic_id        NUMBER          NULL for admins</text>
+    <text class="attr" x="1206" y="206">full_name      VARCHAR2(100)  NOT NULL</text>
+    <text class="attr" x="1206" y="226">username      VARCHAR2(50)    UK</text>
+    <text class="attr" x="1206" y="246">email             VARCHAR2(100)  UK</text>
+    <text class="attr" x="1206" y="266">password_hash VARCHAR2(255) NOT NULL</text>
+    <text class="attr" x="1206" y="286">role                VARCHAR2(20)    see note ↓</text>
+  </g>
+
+  <!-- PATIENTS -->
+  <g>
+    <rect x="60" y="440" width="370" height="220" rx="10" fill="#ffffff" stroke="#9fb3ca" stroke-width="1.5"/>
+    <path d="M 60,454 Q 60,440 74,440 L 416,440 Q 430,440 430,454 L 430,474 L 60,474 Z" fill="#2a7f6f"/>
+    <text class="headtext" x="76" y="463">PATIENTS</text>
+    <text class="key pk" x="76" y="496">PK</text><text class="attr" x="120" y="496">patient_id      NUMBER          identity</text>
+    <text class="key fk" x="76" y="516">FK</text><text class="attr" x="120" y="516">clinic_id        NUMBER          NOT NULL</text>
+    <text class="attr" x="76" y="536">full_name      VARCHAR2(100)  NOT NULL</text>
+    <text class="attr" x="76" y="556">phone             VARCHAR2(15)    unique per clinic</text>
+    <text class="attr" x="76" y="576">email             VARCHAR2(100)</text>
+    <text class="attr" x="76" y="596">gender           VARCHAR2(10)</text>
+    <text class="attr" x="76" y="616">date_of_birth DATE</text>
+    <text class="attr" x="76" y="636">created_at      TIMESTAMP</text>
+  </g>
+
+  <!-- APPOINTMENTS -->
+  <g>
+    <rect x="560" y="440" width="410" height="220" rx="10" fill="#ffffff" stroke="#9fb3ca" stroke-width="1.5"/>
+    <path d="M 560,454 Q 560,440 574,440 L 956,440 Q 970,440 970,454 L 970,474 L 560,474 Z" fill="#b35a2a"/>
+    <text class="headtext" x="576" y="463">APPOINTMENTS</text>
+    <text class="key pk" x="576" y="496">PK</text><text class="attr" x="620" y="496">appointment_id  NUMBER         identity</text>
+    <text class="key fk" x="576" y="516">FK</text><text class="attr" x="620" y="516">clinic_id            NUMBER         NOT NULL</text>
+    <text class="key fk" x="576" y="536">FK</text><text class="attr" x="620" y="536">patient_id         NUMBER         + tenant FK</text>
+    <text class="key fk" x="576" y="556">FK</text><text class="attr" x="620" y="556">doctor_id          NUMBER         + tenant FK</text>
+    <text class="attr" x="576" y="576">appointment_datetime  TIMESTAMP  NOT NULL</text>
+    <text class="attr" x="576" y="596">token_no              NUMBER      unique per doctor+time</text>
+    <text class="attr" x="576" y="616">status                 VARCHAR2(20)  see note ↓</text>
+    <text class="attr" x="576" y="636">reason                VARCHAR2(250)</text>
+  </g>
+
+  <!-- DOCTORS -->
+  <g>
+    <rect x="1110" y="440" width="370" height="190" rx="10" fill="#ffffff" stroke="#9fb3ca" stroke-width="1.5"/>
+    <path d="M 1110,454 Q 1110,440 1124,440 L 1466,440 Q 1480,440 1480,454 L 1480,474 L 1110,474 Z" fill="#7a5aa6"/>
+    <text class="headtext" x="1126" y="463">DOCTORS</text>
+    <text class="key pk" x="1126" y="496">PK</text><text class="attr" x="1170" y="496">doctor_id       NUMBER         identity</text>
+    <text class="key fk" x="1126" y="516">FK</text><text class="attr" x="1170" y="516">clinic_id        NUMBER         NOT NULL</text>
+    <text class="attr" x="1126" y="536">full_name      VARCHAR2(100) NOT NULL</text>
+    <text class="attr" x="1126" y="556">specialization VARCHAR2(80)   NOT NULL</text>
+    <text class="attr" x="1126" y="576">phone             VARCHAR2(15)   NULL</text>
+    <text class="attr" x="1126" y="596">availability    VARCHAR2(20)  AVAILABLE|BUSY|OFFLINE</text>
+  </g>
+
+  <!-- notes -->
+  <rect class="note" x="60" y="710" width="1500" height="250" rx="10"/>
+  <text class="section" x="84" y="740">KEYS &amp; CONSTRAINTS (fresh schema + migrations 05 / 06 / 08)</text>
+  <text class="notetext" x="84" y="768">• PK (identity NUMBER): clinics.clinic_id · patients.patient_id · doctors.doctor_id · appointments.appointment_id · users.user_id</text>
+  <text class="notetext" x="84" y="790">• Tenant columns: patients.clinic_id, doctors.clinic_id, appointments.clinic_id (NOT NULL); users.clinic_id (NULL only for platform admins).</text>
+  <text class="notetext" x="84" y="812">• Composite FKs: appointments(patient_id, clinic_id) → patients(patient_id, clinic_id); appointments(doctor_id, clinic_id) → doctors(doctor_id, clinic_id).</text>
+  <text class="notetext" x="100" y="834">These composite keys are the DB-level guarantee that an appointment cannot mix records from two clinics.</text>
+  <text class="notetext" x="84" y="856">• Unique: clinics.slug; patients(clinic_id, phone); doctors(clinic_id, NVL(phone, 'NO-PHONE-' || doctor_id));</text>
+  <text class="notetext" x="100" y="878">appointments(doctor_id, appointment_datetime, token_no); users.username; UPPER(users.username); LOWER(users.email).</text>
+  <text class="notetext" x="84" y="900">• Checks: clinic status ACTIVE|SUSPENDED; doctor availability AVAILABLE|BUSY|OFFLINE; appointment status BOOKED|WAITING|IN_PROGRESS|COMPLETED|CANCELLED.</text>
+  <text class="notetext" x="84" y="922">• Role rule: ADMIN / PLATFORM_ADMIN ⇒ clinic_id IS NULL; CLINIC_ADMIN / RECEPTIONIST / DOCTOR ⇒ clinic_id IS NOT NULL.</text>
+  <text class="notetext" x="84" y="944">• There is no FK from appointments to users — appointments are not tied to a login account.</text>
+</svg>

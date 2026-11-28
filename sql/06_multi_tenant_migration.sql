@@ -183,7 +183,8 @@ EXCEPTION WHEN OTHERS THEN IF SQLCODE NOT IN (-1408, -955) THEN RAISE; END IF;
 END;
 /
 BEGIN
-  EXECUTE IMMEDIATE 'CREATE UNIQUE INDEX uq_doctors_clinic_phone ON doctors (clinic_id, phone)';
+  EXECUTE IMMEDIATE 'CREATE UNIQUE INDEX uq_doctors_clinic_phone ON doctors '
+    || '(clinic_id, NVL(phone, ''NO-PHONE-'' || TO_CHAR(doctor_id)))';
 EXCEPTION WHEN OTHERS THEN IF SQLCODE NOT IN (-1408, -955) THEN RAISE; END IF;
 END;
 /

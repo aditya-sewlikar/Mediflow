@@ -5,7 +5,6 @@ revalidated against the database on every request). Client-supplied clinic
 identifiers are never used to scope a query.
 """
 import hmac
-import os
 import re
 import secrets
 from collections import defaultdict
@@ -13,24 +12,27 @@ from datetime import date, datetime, timedelta
 from functools import wraps
 from urllib.parse import urlsplit
 
-import oracledb
 from flask import (Flask, abort, flash, redirect, render_template, request,
                    session, url_for)
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from db import execute, query, query_one, transaction
+from config import config
+from db import (DatabaseError, IntegrityError, execute, insert_and_get_id,
+                query, query_one, schema_column_exists, transaction)
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY") or secrets.token_hex(32)
+app.secret_key = config.secret_key
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
-    SESSION_COOKIE_SECURE=os.getenv("FLASK_ENV") == "production",
+    SESSION_COOKIE_SECURE=config.session_cookie_secure,
+    PERMANENT_SESSION_LIFETIME=timedelta(seconds=config.session_lifetime_seconds),
+    SESSION_REFRESH_EACH_REQUEST=True,
 )
 
 APP_VERSION = "3.0"
-CLINIC_NAME = os.getenv("CLINIC_NAME", "MediFlow Clinic")
-SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", "support@mediflow.clinic")
+CLINIC_NAME = config.clinic_name
+SUPPORT_EMAIL = config.support_email
 
 STATUSES = ["BOOKED", "WAITING", "IN_PROGRESS", "COMPLETED", "CANCELLED"]
 ACTIVE = ("BOOKED", "WAITING", "IN_PROGRESS")
@@ -97,7 +99,7 @@ DEFAULT_PREFS = {
 }
 
 # Set DISABLE_LOGIN=1 to skip login in a local demo.
-LOGIN_ENABLED = os.getenv("DISABLE_LOGIN", "0") != "1"
+LOGIN_ENABLED = config.login_enabled
 
 
 # ---------- helpers ----------
@@ -131,16 +133,6 @@ def parse_iso_date(text):
         return datetime.strptime((text or "").strip(), "%Y-%m-%d").date()
     except (TypeError, ValueError):
         return None
-
-
-def schema_column_exists(table, column):
-    """Check an existing Oracle schema without changing it."""
-    row = query_one(
-        """SELECT COUNT(*) AS c FROM user_tab_columns
-           WHERE table_name = :t AND column_name = :c""",
-        {"t": table.upper(), "c": column.upper()},
-    )
-    return bool(row and int(row["c"]))
 
 
 # ---------- tenant context ----------
@@ -225,7 +217,7 @@ def revalidate_session():
                 WHERE u.user_id = :i""",
             {"i": uid},
         )
-    except oracledb.Error:
+    except DatabaseError:
         app.logger.exception("Could not revalidate the signed-in account")
         abort(500, description=(
             "The database schema is out of date. Run "
@@ -393,14 +385,41 @@ def can_manage():
     return (not LOGIN_ENABLED) or session.get("role") in MANAGE_ROLES
 
 
-def require_write_access():
+def require_write_access(allow_clinic_choice=False):
     if not can_manage():
         abort(403)
-    # A platform admin in the global view has no clinic to own a new record.
-    if is_platform_admin() and tenant_id() is None:
+    # A platform admin in the global view has no clinic in the session. Record
+    # creation may still work if the admin picks a clinic in the form; every
+    # other write (edits, status changes, availability) needs a tenant context.
+    if is_platform_admin() and tenant_id() is None and not allow_clinic_choice:
         abort(403, description=(
             "Choose a clinic from Platform Clinics before changing clinical records."
         ))
+
+
+def active_clinics():
+    """Clinics a platform admin may explicitly create a record for."""
+    return query(
+        "SELECT clinic_id, clinic_name FROM clinics "
+        "WHERE status = 'ACTIVE' ORDER BY clinic_name"
+    )
+
+
+def chosen_clinic_id(raw_id):
+    """Validate a clinic chosen in a form; never trust the raw value itself."""
+    if not raw_id or not str(raw_id).strip().isdigit():
+        return None
+    row = query_one(
+        """SELECT clinic_id FROM clinics
+            WHERE clinic_id = :i AND status = 'ACTIVE'""",
+        {"i": int(str(raw_id).strip())},
+    )
+    return int(row["clinic_id"]) if row else None
+
+
+def global_clinic_choice():
+    """True when the form needs a clinic selector (platform admin, global view)."""
+    return is_platform_admin() and tenant_id() is None
 
 
 def csrf_token():
@@ -495,7 +514,7 @@ def all_doctors():
             """SELECT doctor_id, full_name, specialization, phone, availability
                FROM doctors""" + where_sql + " ORDER BY full_name", params
         )
-    except oracledb.Error:
+    except DatabaseError:
         app.logger.warning(
             "Doctor availability column is missing. Run "
             "@sql/05_auth_and_availability_migration.sql to update the schema."
@@ -882,16 +901,21 @@ def security_headers(response):
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "same-origin")
+    response.headers.setdefault(
+        "Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()"
+    )
     # Statistics must never be served from a browser cache after a status change.
     response.headers.setdefault("Cache-Control", "no-store, max-age=0, must-revalidate")
     response.headers.setdefault(
         "Content-Security-Policy",
         "default-src 'self'; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-        "font-src https://fonts.gstatic.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
         "img-src 'self' data:; "
         "script-src 'self'; "
         "connect-src 'self'; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
         "form-action 'self'; "
         "frame-ancestors 'none'",
     )
@@ -953,7 +977,7 @@ def login():
                   WHERE UPPER(u.username) = UPPER(:u)""",
                 {"u": username},
             )
-        except oracledb.Error:
+        except DatabaseError:
             app.logger.exception("Could not validate sign-in credentials")
             flash("Sign-in is temporarily unavailable. Please try again.", "error")
             return render_template("login.html", next_url=next_url)
@@ -965,11 +989,9 @@ def login():
             ):
                 flash("This clinic account is not active. Contact platform support.", "error")
                 return render_template("login.html", next_url=next_url)
-            # Keep the current CSRF token so forms rendered before sign-in
-            # (and the first POST after the redirect) remain valid.
-            current_csrf = session.get("_csrf")
+            # Rotate the CSRF token on privilege change to prevent fixation.
             session.clear()
-            session["_csrf"] = current_csrf or secrets.token_urlsafe(32)
+            session["_csrf"] = secrets.token_urlsafe(32)
             session["user_id"] = u["user_id"]
             session["user"] = u["username"]
             session["name"] = u["full_name"] or u["username"]
@@ -1028,7 +1050,7 @@ def signup():
                           OR (email IS NOT NULL AND LOWER(email) = LOWER(:e))""",
                     {"u": form_data["username"], "e": form_data["email"]},
                 )
-            except oracledb.Error:
+            except DatabaseError:
                 app.logger.exception("Could not check sign-up duplicates")
                 errors.append("Registration is temporarily unavailable. Please try again.")
             else:
@@ -1042,26 +1064,27 @@ def signup():
             try:
                 # One transaction: the clinic and its administrator either
                 # both exist or neither does. The clinic_id is generated by
-                # Oracle and never accepted from the browser.
+                # the database and never accepted from the browser.
                 with transaction() as cur:
                     base_slug = slugify(form_data["clinic_name"])
                     slug = base_slug
                     cur.execute("SELECT COUNT(*) FROM clinics WHERE slug = :s", {"s": slug})
                     if cur.fetchone()[0]:
                         slug = f"{base_slug}-{secrets.token_hex(3)}"
-                    new_id = cur.var(oracledb.NUMBER)
-                    cur.execute(
+                    new_id = insert_and_get_id(
+                        cur,
                         """INSERT INTO clinics (clinic_name, slug, email)
-                           VALUES (:n, :s, :e) RETURNING clinic_id INTO :id""",
+                           VALUES (:n, :s, :e)""",
                         {"n": form_data["clinic_name"], "s": slug,
-                         "e": form_data["email"], "id": new_id},
+                         "e": form_data["email"]},
+                        "clinic_id",
                     )
                     cur.execute(
                         """INSERT INTO users
                               (clinic_id, full_name, username, email, password_hash, role)
                            VALUES (:c, :n, :u, :e, :p, :r)""",
                         {
-                            "c": new_id.getvalue()[0],
+                            "c": new_id,
                             "n": form_data["full_name"],
                             "u": form_data["username"],
                             "e": form_data["email"],
@@ -1069,9 +1092,9 @@ def signup():
                             "r": REGISTRATION_ROLE,
                         },
                     )
-            except oracledb.IntegrityError:
+            except IntegrityError:
                 errors.append("Those details are already registered. Check the username and email.")
-            except oracledb.Error:
+            except DatabaseError:
                 app.logger.exception("Could not create clinic and administrator")
                 errors.append("Registration is temporarily unavailable. Please try again.")
             else:
@@ -1258,8 +1281,9 @@ def search():
 # ---------- patients ----------
 @app.route("/patients", methods=["GET", "POST"])
 def patients():
+    clinic_choices = active_clinics() if global_clinic_choice() else []
     if request.method == "POST":
-        require_write_access()
+        require_write_access(allow_clinic_choice=True)
         name = (request.form.get("full_name") or "").strip()
         phone = (request.form.get("phone") or "").strip()
         email = (request.form.get("email") or "").strip() or None
@@ -1281,6 +1305,12 @@ def patients():
             except ValueError:
                 errors.append("Enter a valid date of birth.")
 
+        clinic = None
+        if clinic_choices:
+            clinic = chosen_clinic_id(request.form.get("clinic_id"))
+            if clinic is None:
+                errors.append("Choose the clinic this patient belongs to.")
+
         if errors:
             for message in errors:
                 flash(message, "error")
@@ -1290,13 +1320,13 @@ def patients():
                     """INSERT INTO patients
                           (clinic_id, full_name, phone, email, gender, date_of_birth)
                        VALUES (:c, :n, :p, :e, :g, :d)""",
-                    {"c": tenant_id(), "n": name, "p": phone,
-                     "e": email, "g": gender, "d": dob},
+                    {"c": clinic if clinic is not None else tenant_id(),
+                     "n": name, "p": phone, "e": email, "g": gender, "d": dob},
                 )
                 invalidate_stats()
                 flash(f"Patient {name} registered.", "ok")
                 return redirect(url_for("patients"))
-            except oracledb.IntegrityError:
+            except IntegrityError:
                 flash("A patient with this phone number already exists.", "error")
 
     q = (request.args.get("q") or "").strip()
@@ -1330,6 +1360,7 @@ def patients():
         "patients.html",
         patients=rows,
         q=q,
+        clinic_choices=clinic_choices,
         open_form=request.method == "POST",
         form_data=request.form if request.method == "POST" else {},
         patient_total=int(summary.get("total") or 0),
@@ -1381,7 +1412,7 @@ def patient_edit(patient_id):
                 )
                 flash("Patient details saved.", "ok")
                 return redirect(url_for("patient_edit", patient_id=patient_id))
-            except oracledb.IntegrityError:
+            except IntegrityError:
                 flash("Another patient already uses this phone number.", "error")
 
     history = query(
@@ -1407,8 +1438,9 @@ def patient_edit(patient_id):
 # ---------- doctors ----------
 @app.route("/doctors", methods=["GET", "POST"])
 def doctors():
+    clinic_choices = active_clinics() if global_clinic_choice() else []
     if request.method == "POST":
-        require_write_access()
+        require_write_access(allow_clinic_choice=True)
         name = (request.form.get("full_name") or "").strip()
         spec = (request.form.get("specialization") or "").strip()
         phone = (request.form.get("phone") or "").strip() or None
@@ -1421,6 +1453,12 @@ def doctors():
         if phone and not PHONE_RE.fullmatch(phone):
             errors.append("Enter a phone number with 7 to 15 digits, using numbers only.")
 
+        clinic = None
+        if clinic_choices:
+            clinic = chosen_clinic_id(request.form.get("clinic_id"))
+            if clinic is None:
+                errors.append("Choose the clinic this doctor belongs to.")
+
         if errors:
             for message in errors:
                 flash(message, "error")
@@ -1429,12 +1467,13 @@ def doctors():
                 execute(
                     """INSERT INTO doctors (clinic_id, full_name, specialization, phone)
                        VALUES (:c, :n, :s, :p)""",
-                    {"c": tenant_id(), "n": name, "s": spec, "p": phone},
+                    {"c": clinic if clinic is not None else tenant_id(),
+                     "n": name, "s": spec, "p": phone},
                 )
                 invalidate_stats()
                 flash(f"{name} added.", "ok")
                 return redirect(url_for("doctors"))
-            except oracledb.IntegrityError:
+            except IntegrityError:
                 flash("A doctor with this phone number already exists.", "error")
 
     rows = all_doctors()
@@ -1446,6 +1485,7 @@ def doctors():
         "doctors.html",
         doctors=rows,
         doctor_cards=doctor_cards,
+        clinic_choices=clinic_choices,
         open_form=request.method == "POST",
         form_data=request.form if request.method == "POST" else {},
     )
@@ -1485,11 +1525,11 @@ def doctor_availability(doctor_id):
             "WHERE doctor_id = :i AND clinic_id = :c",
             {"a": value, "i": doctor_id, "c": doctor["clinic_id"]},
         )
-    except oracledb.IntegrityError:
+    except IntegrityError:
         app.logger.exception("Invalid availability value rejected by the database")
         flash("Availability could not be saved because the value is not allowed.", "error")
         return redirect(next_url)
-    except oracledb.Error as exc:
+    except DatabaseError as exc:
         app.logger.exception("Could not save doctor availability (ORA-%s)", getattr(exc, "code", "?"))
         flash("Availability could not be saved. Please try again or contact support.", "error")
         return redirect(next_url)
@@ -1508,7 +1548,9 @@ def book(patient_id, doctor_id, when, reason, token):
     """Book inside one transaction, verifying that both records own the same clinic.
 
     The clinic id comes from the session; a forged form field cannot influence
-    it. Locking the doctor row also serialises concurrent token allocation.
+    it. Locking the doctor row serialises concurrent token allocation, and
+    locking the patient row serialises the one-active-appointment-per-patient
+    rule below.
     """
     clinic = tenant_id()
     if clinic is None:
@@ -1523,12 +1565,28 @@ def book(patient_id, doctor_id, when, reason, token):
         if not row or int(row[0]) != clinic:
             raise ValueError("Choose a doctor from your clinic.")
         cur.execute(
-            "SELECT clinic_id FROM patients WHERE patient_id = :p",
+            "SELECT clinic_id FROM patients WHERE patient_id = :p FOR UPDATE",
             {"p": patient_id},
         )
         row = cur.fetchone()
         if not row or int(row[0]) != clinic:
             raise ValueError("Choose a patient from your clinic.")
+
+        # One patient may have only one open visit at a time. A completed or
+        # cancelled visit is history, so it never blocks a new booking.
+        active_binds = {f"st{i}": status for i, status in enumerate(ACTIVE)}
+        active_sql = ", ".join(f":st{i}" for i in range(len(ACTIVE)))
+        cur.execute(
+            f"""SELECT COUNT(*) FROM appointments
+                 WHERE clinic_id = :c AND patient_id = :p
+                   AND status IN ({active_sql})""",
+            {"c": clinic, "p": patient_id, **active_binds},
+        )
+        if cur.fetchone()[0]:
+            raise ValueError(
+                "This patient already has an active appointment with a doctor. "
+                "Complete or cancel it before booking another."
+            )
 
         cur.execute(
             """SELECT COUNT(*) FROM appointments
@@ -1592,7 +1650,7 @@ def appointments():
                 return redirect(url_for("appointments", date=when.date().isoformat()))
             except ValueError as e:
                 flash(str(e), "error")
-            except oracledb.IntegrityError:
+            except IntegrityError:
                 flash("This doctor already has that token at that exact time.", "error")
 
     d = parse_date(request.args.get("date"))
@@ -2150,7 +2208,7 @@ def settings():
             scope_params,
         )
         counts = row or {}
-    except oracledb.Error:
+    except DatabaseError:
         app.logger.exception("Could not load settings counts")
 
     return render_template(
@@ -2167,4 +2225,4 @@ def help():
 
 
 if __name__ == "__main__":
-    app.run(debug=os.getenv("FLASK_DEBUG", "0") == "1")
+    app.run(debug=config.debug)

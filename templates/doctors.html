@@ -109,6 +109,18 @@
     </div>
     <div class="dialog-body">
       <div class="form">
+        {% if clinic_choices %}
+        <label class="field">
+          <span class="field-label">Clinic <span class="required" aria-hidden="true">*</span></span>
+          <select class="select" name="clinic_id" required>
+            <option value="">Choose a clinic</option>
+            {% for clinic in clinic_choices %}
+            <option value="{{ clinic.clinic_id }}" {% if form_data.get('clinic_id')|string == clinic.clinic_id|string %}selected{% endif %}>{{ clinic.clinic_name }}</option>
+            {% endfor %}
+          </select>
+          <span class="field-help">Platform view: choose which clinic owns this doctor.</span>
+        </label>
+        {% endif %}
         <label class="field">
           <span class="field-label">Full name <span class="required" aria-hidden="true">*</span></span>
           <input class="input" name="full_name" maxlength="100" value="{{ form_data.get('full_name', '') }}" autocomplete="name" required>

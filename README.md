@@ -5,9 +5,61 @@ isolated tenant**. A self-service registration creates a new clinic, generates
 its `clinic_id` in Oracle, and creates that clinic's administrator in the same
 transaction. Platform administration is separate from clinic administration.
 
-## 1. Database (do this first)
+**Schema / ER diagram:** [`docs/er-diagram.svg`](docs/er-diagram.svg) (view),
+[`docs/ER_DIAGRAM.md`](docs/ER_DIAGRAM.md) (details and Mermaid source).
 
-### Fresh install
+## 1. Configuration and database
+
+Settings are loaded from `.env` (shared defaults), then `.env.local` (local
+secrets, which overrides `.env`). Real environment variables override both.
+`.env.example` is documentation only and is never loaded. `.env` and
+`.env.local` are git-ignored.
+
+Provide the connection either as one string or as manual fields:
+
+```
+# .env.local - connection string (MariaDB or Oracle)
+DATABASE_URL=mariadb+pymysql://mediflow:secret@127.0.0.1:3306/mediflow?charset=utf8mb4
+# DATABASE_URL=oracle://clinic:secret@localhost:1521/FREEPDB1
+SECRET_KEY=<48+ random characters>
+```
+
+```
+# .env.local - manual fields alternative
+DB_BACKEND=mariadb
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_NAME=mediflow
+DB_USER=mediflow
+DB_PASSWORD=secret
+DB_CHARSET=utf8mb4
+```
+
+Generate a stable key with:
+```
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+`SECRET_KEY` is required when `FLASK_ENV=production`. `FLASK_DEBUG=1` and
+`DISABLE_LOGIN=1` are refused in production.
+
+### MariaDB (fresh install, MySQL-compatible)
+
+```
+python setup_db.py                 # prompts for host, port, database, app user, password
+python setup_db.py --init          # creates the database/user and runs sql/mysql/01_schema.sql
+```
+If the selected database already contains MediFlow tables, setup refuses to
+overwrite them. Only `python setup_db.py --init --reset --confirm` drops those
+five tables first. A connection string is accepted too:
+```
+python setup_db.py --url "mariadb+pymysql://user:pass@127.0.0.1:3306/mediflow" --init
+```
+The `mysql` CLI is not needed: the schema is executed through PyMySQL. This
+path never connects to Oracle.
+
+### Oracle (legacy install)
+
+Fresh install:
 ```
 sqlplus clinic/ChangeMe_123@localhost:1521/FREEPDB1
 SQL> @sql/01_schema.sql        -- creates CLINICS + tenant keys/constraints
@@ -17,35 +69,27 @@ SQL> @sql/04_tests.sql         -- most statements here SHOULD fail (constraint t
 SQL> @sql/07_multi_tenant_tests.sql  -- cross-tenant constraint proof
 ```
 
-### Existing single-clinic database (preserves every record)
-Do **not** re-run `sql/01_schema.sql`. Run the idempotent migrations:
+Existing single-clinic database (preserves every record): do **not** re-run
+`sql/01_schema.sql`. Run the idempotent migrations:
 ```
 sqlplus clinic/ChangeMe_123@localhost:1521/FREEPDB1
 SQL> @sql/05_auth_and_availability_migration.sql   -- older account fields (once)
 SQL> @sql/06_multi_tenant_migration.sql            -- tenant conversion
+SQL> @sql/08_optional_doctor_phone_migration.sql   -- allow blank doctor phones (once)
 SQL> @sql/07_multi_tenant_tests.sql                -- optional verification
 ```
 `06_multi_tenant_migration.sql` adds `CLINICS`, `clinic_id` on all four data
-tables, direct `clinic_id → clinics` ownership foreign keys, tenant-qualified
-composite foreign keys and per-clinic phone uniqueness. It assigns all existing
-patients, doctors and appointments to one **default clinic**
-(`slug = 'default-clinic'`), keeps the existing `admin` account as a platform
-administrator (`clinic_id = NULL`) and keeps the existing `clinic` account in
-the default clinic. No table or row is dropped. It is safe to re-run.
-
-`sql/00_create_user.sql` optionally creates the schema; `sql/00_drop_all.sql`
-is a destructive reset helper — never run it on a live database.
+tables, tenant-composite foreign keys and per-clinic phone uniqueness. It
+assigns existing records to one default clinic (`slug = 'default-clinic'`),
+keeps `admin` as a platform administrator and `clinic` in the default clinic.
+`sql/00_drop_all.sql` is a destructive reset helper — never run it on a live
+database.
 
 ## 2. Run the web app
 ```
 python -m venv venv
 venv\Scripts\activate          (Linux/macOS: source venv/bin/activate)
 pip install -r requirements.txt
-
-set DB_USER=clinic             (Linux/macOS: export ...)
-set DB_PASSWORD=ChangeMe_123
-set DB_DSN=localhost:1521/FREEPDB1
-set SECRET_KEY=a-stable-random-value
 python app.py
 ```
 Open http://127.0.0.1:5000
@@ -57,9 +101,15 @@ from the database, never hardcoded). Use `FLASK_DEBUG=1` only locally.
 
 | Role | Clinic context | What it can see |
 |---|---|---|
-| `PLATFORM_ADMIN` / legacy `ADMIN` | `clinic_id IS NULL` | Global dashboard, reports, all clinics and accounts in **Platform Clinics**; can explicitly choose a clinic to work in |
+| `PLATFORM_ADMIN` / legacy `ADMIN` | `clinic_id IS NULL` | Global dashboard, reports, all clinics and accounts in **Platform Clinics**; can pick a clinic in the patient/doctor add form or enter a tenant workspace via **Platform Clinics** |
 | `CLINIC_ADMIN` (self-service signup) | its own `clinic_id` | Only its clinic's patients, doctors and appointments |
 | `RECEPTIONIST`, `DOCTOR` | its own `clinic_id` | Only its clinic's data (DOCTOR is read-only except availability) |
+
+A patient may have only **one active appointment at a time**
+(`BOOKED`, `WAITING` or `IN_PROGRESS`). Complete or cancel that visit before
+booking another patient visit; `COMPLETED` and `CANCELLED` rows are history and
+do not block new bookings. The check runs inside the booking transaction, so
+concurrent requests cannot create two open visits for the same patient.
 
 The clinic id used by every query comes from the signed Flask session and is
 **re-read from the database on each request**. No route accepts a clinic id
@@ -104,9 +154,14 @@ against the `CLINICS` table first.
 
 Database level: `@sql/07_multi_tenant_tests.sql` proves that duplicate phones
 are allowed in two clinics and cross-tenant patient/doctor bookings are
-rejected by Oracle.
+rejected by Oracle. The MariaDB schema enforces the same rules with composite
+foreign keys; unique indexes permit multiple NULL phones there.
 
-Application level (automated, uses the live configured Oracle schema):
+Application level (no database required):
+```
+python -m unittest tests.test_security -v
+```
+Application level (uses the live configured Oracle or MariaDB schema):
 ```
 python -m unittest tests.test_tenant_isolation -v
 ```
@@ -124,9 +179,9 @@ never contain the other clinic's records. Sign in as `admin` and open
 ## 7. Known limitations
 
 * Flask's signed cookie session is the tenant boundary. Keep `SECRET_KEY`
-  stable and private; for very high-assurance deployments use Oracle VPD /
-  `DBMS_SESSION.SET_CONTEXT` with a connection-level tenant context as a second
-  line of defence.
+  stable and private. For very high-assurance Oracle deployments use VPD /
+  `DBMS_SESSION.SET_CONTEXT`; on MariaDB, enforce tenant separation with a
+  connection-level tenant context or a proxy user as a second line of defence.
 * Platform administrators deliberately have a global view; anyone with that
   role can read every tenant. Only trusted operators should receive it.
 * `DOCTOR` accounts can publish availability but cannot edit other records.

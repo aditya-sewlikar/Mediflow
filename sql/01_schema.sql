@@ -63,7 +63,11 @@ CREATE TABLE doctors (
   CONSTRAINT uq_doctor_tenant_id UNIQUE (doctor_id, clinic_id)
 );
 
-CREATE UNIQUE INDEX uq_doctors_clinic_phone ON doctors (clinic_id, phone);
+-- Phone is optional, so the unique key falls back to a per-doctor marker for
+-- blank phones. Otherwise Oracle treats two NULL phones in one clinic as a
+-- duplicate and the second doctor cannot be added.
+CREATE UNIQUE INDEX uq_doctors_clinic_phone
+    ON doctors (clinic_id, NVL(phone, 'NO-PHONE-' || TO_CHAR(doctor_id)));
 CREATE INDEX idx_doctors_clinic ON doctors (clinic_id);
 
 -- APPOINTMENT AND QUEUE TABLE
